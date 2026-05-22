@@ -19,7 +19,8 @@ app.get('/health', (_req, res) => {
 // Routes
 import authRouter from './routes/auth';
 app.use('/api/auth', authRouter);
-// app.use('/api/matches', matchesRouter);  — added in feature/matches
+import matchesRouter from './routes/matches';
+app.use('/api/matches', matchesRouter);
 // app.use('/api/bets', betsRouter);        — added in feature/bets
 // app.use('/api/leaderboard', leaderboardRouter);
 // app.use('/api/admin', adminRouter);
