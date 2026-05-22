@@ -14,8 +14,9 @@ function isTournamentActive(): boolean {
 }
 
 export async function startPoller(): Promise<void> {
-  if (!process.env.FOOTBALL_API_KEY || process.env.FOOTBALL_API_KEY === 'your_api_football_key_here') {
-    console.log('[Poller] FOOTBALL_API_KEY not set — live sync disabled. Set it in .env to enable.');
+  if (!process.env.FOOTBALL_API_KEY || process.env.FOOTBALL_API_KEY === 'your_football_data_key_here') {
+    console.log('[Poller] FOOTBALL_API_KEY not set — live sync disabled.')
+    console.log('[Poller] Register free at https://www.football-data.org/client/register then add key to .env');
     return;
   }
 
