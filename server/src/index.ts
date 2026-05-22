@@ -21,7 +21,8 @@ import authRouter from './routes/auth';
 app.use('/api/auth', authRouter);
 import matchesRouter from './routes/matches';
 app.use('/api/matches', matchesRouter);
-// app.use('/api/bets', betsRouter);        — added in feature/bets
+import betsRouter from './routes/bets';
+app.use('/api/bets', betsRouter);
 // app.use('/api/leaderboard', leaderboardRouter);
 // app.use('/api/admin', adminRouter);
 
