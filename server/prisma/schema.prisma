@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Stage {
+  GROUP
+  ROUND_OF_16
+  QUARTER_FINAL
+  SEMI_FINAL
+  FINAL
+}
+
+enum MatchStatus {
+  UPCOMING
+  LIVE
+  FINISHED
+}
+
+enum SpecialBetType {
+  CHAMPION
+  TOP_SCORER
+  TOP_ASSISTS
+}
+
+model User {
+  id          Int      @id @default(autoincrement())
+  username    String   @unique
+  email       String   @unique
+  password    String
+  role        Role     @default(USER)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  matchBets   MatchBet[]
+  specialBets SpecialBet[]
+}
+
+model Team {
+  id        Int    @id @default(autoincrement())
+  name      String @unique
+  code      String @unique // e.g. "BRA", "ARG"
+  group     String // "A", "B", ... "L"
+  flagUrl   String?
+
+  homeMatches  Match[] @relation("HomeTeam")
+  awayMatches  Match[] @relation("AwayTeam")
+  specialBets  SpecialBet[]
+  players      Player[]
+}
+
+model Player {
+  id     Int    @id @default(autoincrement())
+  name   String
+  teamId Int
+  team   Team   @relation(fields: [teamId], references: [id])
+
+  topScorerBets  SpecialBet[] @relation("TopScorerPlayer")
+  topAssistsBets SpecialBet[] @relation("TopAssistsPlayer")
+}
+
+model Match {
+  id           Int         @id @default(autoincrement())
+  homeTeamId   Int
+  awayTeamId   Int
+  homeTeam     Team        @relation("HomeTeam", fields: [homeTeamId], references: [id])
+  awayTeam     Team        @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  stage        Stage
+  groupRound   Int?        // 1, 2, or 3 — only for GROUP stage
+  matchDate    DateTime
+  venue        String?
+  homeScore    Int?        // null until match is finished
+  awayScore    Int?
+  status       MatchStatus @default(UPCOMING)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  bets         MatchBet[]
+}
+
+model MatchBet {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  matchId        Int
+  predictedHome  Int
+  predictedAway  Int
+  pointsAwarded  Int?     // null until match is scored
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  match Match @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, matchId])
+}
+
+model SpecialBet {
+  id        Int            @id @default(autoincrement())
+  userId    Int
+  type      SpecialBetType
+  teamId    Int?           // for CHAMPION
+  playerId  Int?           // for TOP_SCORER / TOP_ASSISTS (kept for future player data)
+  playerName String?       // free-text player name entry for now
+
+  pointsAwarded Int?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team           Team?   @relation(fields: [teamId], references: [id])
+  topScorerPlayer  Player? @relation("TopScorerPlayer", fields: [playerId], references: [id])
+  topAssistsPlayer Player? @relation("TopAssistsPlayer", fields: [playerId], references: [id])
+
+  @@unique([userId, type])
+}
