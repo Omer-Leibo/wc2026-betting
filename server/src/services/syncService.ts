@@ -205,6 +205,9 @@ async function processOneFixture(fixture: ApiFixture, result: SyncResult): Promi
 // ─── Team resolution ──────────────────────────────────────────────────────────
 
 async function resolveTeam(apiId: number, apiName: string) {
+  // Knockout fixtures have TBD slots with no ID yet — skip them
+  if (!apiId || !apiName || apiName === 'TBD') return null;
+
   // First try by external ID (fastest, most reliable)
   const byId = await prisma.team.findUnique({ where: { externalId: apiId } });
   if (byId) return byId;
