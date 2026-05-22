@@ -66,9 +66,6 @@ model Player {
   name   String
   teamId Int
   team   Team   @relation(fields: [teamId], references: [id])
-
-  topScorerBets  SpecialBet[] @relation("TopScorerPlayer")
-  topAssistsBets SpecialBet[] @relation("TopAssistsPlayer")
 }
 
 model Match {
@@ -127,10 +124,8 @@ model SpecialBet {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  team           Team?   @relation(fields: [teamId], references: [id])
-  topScorerPlayer  Player? @relation("TopScorerPlayer", fields: [playerId], references: [id])
-  topAssistsPlayer Player? @relation("TopAssistsPlayer", fields: [playerId], references: [id])
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team  Team? @relation(fields: [teamId], references: [id])
 
   @@unique([userId, type])
 }
