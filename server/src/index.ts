@@ -23,7 +23,8 @@ import matchesRouter from './routes/matches';
 app.use('/api/matches', matchesRouter);
 import betsRouter from './routes/bets';
 app.use('/api/bets', betsRouter);
-// app.use('/api/leaderboard', leaderboardRouter);
+import leaderboardRouter from './routes/leaderboard';
+app.use('/api/leaderboard', leaderboardRouter);
 // app.use('/api/admin', adminRouter);
 
 app.listen(PORT, () => {
