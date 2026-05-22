@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth';
+import { scoreMatch } from '../services/scoring';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -76,15 +77,22 @@ router.patch('/:id/result', authenticate, requireAdmin, async (req: AuthRequest,
   const id = parseInt(req.params.id as string);
   const { homeScore, awayScore, status } = parse.data;
 
+  const finalStatus = status ?? 'FINISHED';
   const match = await prisma.match.update({
     where: { id },
-    data: {
-      homeScore,
-      awayScore,
-      status: status ?? 'FINISHED',
-    },
+    data: { homeScore, awayScore, status: finalStatus },
     include: { homeTeam: { select: teamSelect }, awayTeam: { select: teamSelect } },
   });
+
+  // Auto-score bets when match is marked FINISHED
+  if (finalStatus === 'FINISHED') {
+    try {
+      await scoreMatch(id);
+    } catch (err) {
+      console.error('Scoring failed for match', id, err);
+      // Don't fail the request — score can be retried
+    }
+  }
 
   res.json({ match });
 });
