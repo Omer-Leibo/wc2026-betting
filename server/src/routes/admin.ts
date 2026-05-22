@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth';
 import { scoreSpecialBets } from '../services/scoring';
+import { syncAllFixtures, syncLiveFixtures, getLastSync } from '../services/syncService';
+import { fetchQuota } from '../services/footballApi';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -99,13 +101,48 @@ router.post('/special-results', async (req: AuthRequest, res: Response): Promise
 // ─── GET /api/admin/stats ─────────────────────────────────────────────────────
 
 router.get('/stats', async (_req: AuthRequest, res: Response): Promise<void> => {
-  const [userCount, matchCount, finishedCount, betCount] = await Promise.all([
+  const [userCount, matchCount, finishedCount, betCount, lastSync] = await Promise.all([
     prisma.user.count(),
     prisma.match.count(),
     prisma.match.count({ where: { status: 'FINISHED' } }),
     prisma.matchBet.count(),
+    getLastSync(),
   ]);
-  res.json({ stats: { userCount, matchCount, finishedCount, betCount } });
+  res.json({ stats: { userCount, matchCount, finishedCount, betCount, lastSync } });
+});
+
+// ─── POST /api/admin/sync  (manual full sync) ─────────────────────────────────
+
+router.post('/sync', async (_req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const result = await syncAllFixtures();
+    res.json({ result });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ message: msg });
+  }
+});
+
+// ─── POST /api/admin/sync/live  (manual live-only sync) ───────────────────────
+
+router.post('/sync/live', async (_req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const result = await syncLiveFixtures();
+    res.json({ result });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ message: msg });
+  }
+});
+
+// ─── GET /api/admin/sync/status ───────────────────────────────────────────────
+
+router.get('/sync/status', async (_req: AuthRequest, res: Response): Promise<void> => {
+  const [lastSync, quota] = await Promise.all([
+    getLastSync(),
+    fetchQuota().catch(() => null),
+  ]);
+  res.json({ lastSync, quota });
 });
 
 export default router;

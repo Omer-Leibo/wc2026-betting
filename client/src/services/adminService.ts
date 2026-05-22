@@ -10,11 +10,24 @@ export interface AdminUser {
   _count: { matchBets: number; specialBets: number };
 }
 
+export interface SyncResult {
+  matchesUpdated: number;
+  newlyScored: number;
+  teamsLinked: number;
+  errors: string[];
+}
+
+export interface SyncStatus {
+  lastSync: { syncedAt: string; matchesUpdated: number; newlyScored: number; error: string | null } | null;
+  quota: { current: number; limit: number } | null;
+}
+
 export interface AdminStats {
   userCount: number;
   matchCount: number;
   finishedCount: number;
   betCount: number;
+  lastSync?: SyncStatus['lastSync'];
 }
 
 export const adminService = {
@@ -53,5 +66,20 @@ export const adminService = {
   async getStats(): Promise<AdminStats> {
     const { data } = await api.get<{ stats: AdminStats }>('/admin/stats');
     return data.stats;
+  },
+
+  async syncAll(): Promise<SyncResult> {
+    const { data } = await api.post<{ result: SyncResult }>('/admin/sync');
+    return data.result;
+  },
+
+  async syncLive(): Promise<SyncResult> {
+    const { data } = await api.post<{ result: SyncResult }>('/admin/sync/live');
+    return data.result;
+  },
+
+  async getSyncStatus(): Promise<SyncStatus> {
+    const { data } = await api.get<SyncStatus>('/admin/sync/status');
+    return data;
   },
 };
