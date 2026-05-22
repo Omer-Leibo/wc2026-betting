@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import dayjs from 'dayjs';
-import { adminService, type AdminUser, type AdminStats } from '../services/adminService';
+import relativeTime from 'dayjs/plugin/relativeTime';
+import { adminService, type AdminUser, type AdminStats, type SyncStatus, type SyncResult } from '../services/adminService';
 import { matchService } from '../services/matchService';
 import type { Match, Team } from '../types';
 
-type Tab = 'overview' | 'results' | 'users' | 'special';
+dayjs.extend(relativeTime);
+
+type Tab = 'overview' | 'results' | 'users' | 'special' | 'sync';
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>('overview');
@@ -27,12 +30,48 @@ export default function AdminPage() {
   const [specialPlayer, setSpecialPlayer] = useState('');
   const [savingSpecial, setSavingSpecial] = useState(false);
 
+  // Sync state
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSyncResult, setLastSyncResult] = useState<SyncResult | null>(null);
+
   useEffect(() => {
-    Promise.all([adminService.getStats(), adminService.getUsers(), adminService.getPendingMatches(), matchService.getTeams()])
-      .then(([s, u, m, t]) => { setStats(s); setUsers(u); setPendingMatches(m); setTeams(t); })
+    Promise.all([
+      adminService.getStats(),
+      adminService.getUsers(),
+      adminService.getPendingMatches(),
+      matchService.getTeams(),
+      adminService.getSyncStatus().catch(() => null),
+    ])
+      .then(([s, u, m, t, ss]) => {
+        setStats(s); setUsers(u); setPendingMatches(m); setTeams(t);
+        if (ss) setSyncStatus(ss);
+      })
       .catch(() => toast.error('Failed to load admin data'))
       .finally(() => setLoading(false));
   }, []);
+
+  const handleSync = async (type: 'full' | 'live') => {
+    setSyncing(true);
+    setLastSyncResult(null);
+    try {
+      const result = type === 'full' ? await adminService.syncAll() : await adminService.syncLive();
+      setLastSyncResult(result);
+      const ss = await adminService.getSyncStatus().catch(() => null);
+      if (ss) setSyncStatus(ss);
+      if (result.errors.length === 0) {
+        toast.success(`Sync complete! ${result.matchesUpdated} matches updated, ${result.newlyScored} scored`);
+      } else {
+        toast.error(`Sync finished with ${result.errors.length} error(s)`);
+      }
+      // Refresh pending matches
+      adminService.getPendingMatches().then(setPendingMatches);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Sync failed');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const handleEnterResult = async () => {
     if (resultMatchId === null) return;
@@ -99,6 +138,12 @@ export default function AdminPage() {
         <button className={tabClass('results')} onClick={() => setTab('results')}>Enter Results</button>
         <button className={tabClass('special')} onClick={() => setTab('special')}>Special Results</button>
         <button className={tabClass('users')} onClick={() => setTab('users')}>Users</button>
+        <button className={tabClass('sync')} onClick={() => setTab('sync')}>
+          🔄 Live Sync
+          {syncStatus?.lastSync && (
+            <span className="ml-1 text-xs opacity-70">{dayjs(syncStatus.lastSync.syncedAt).fromNow()}</span>
+          )}
+        </button>
       </div>
 
       {/* ── OVERVIEW ── */}
@@ -244,6 +289,109 @@ export default function AdminPage() {
               </button>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ── LIVE SYNC ── */}
+      {tab === 'sync' && (
+        <div className="space-y-4 max-w-xl">
+          <div className="card space-y-3">
+            <h2 className="font-semibold">Live Data Sync</h2>
+            <p className="text-gray-400 text-sm">
+              Pulls match schedule and results from <span className="text-white">API-Football</span> and updates the database automatically.
+              The server polls every 5 minutes during the tournament. Use the buttons below for an instant refresh.
+            </p>
+
+            {/* API quota */}
+            {syncStatus?.quota && (
+              <div className="bg-gray-800 rounded-lg px-3 py-2 text-sm flex justify-between">
+                <span className="text-gray-400">API calls today</span>
+                <span className={`font-medium ${syncStatus.quota.current > syncStatus.quota.limit * 0.8 ? 'text-yellow-400' : 'text-green-400'}`}>
+                  {syncStatus.quota.current} / {syncStatus.quota.limit}
+                </span>
+              </div>
+            )}
+
+            {/* Last sync */}
+            {syncStatus?.lastSync && (
+              <div className="bg-gray-800 rounded-lg px-3 py-2 text-sm space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Last sync</span>
+                  <span className="text-white">{dayjs(syncStatus.lastSync.syncedAt).format('D MMM HH:mm:ss')} ({dayjs(syncStatus.lastSync.syncedAt).fromNow()})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Matches updated</span>
+                  <span className="text-white">{syncStatus.lastSync.matchesUpdated}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Newly scored</span>
+                  <span className="text-white">{syncStatus.lastSync.newlyScored}</span>
+                </div>
+                {syncStatus.lastSync.error && (
+                  <p className="text-yellow-400 text-xs mt-1">⚠️ {syncStatus.lastSync.error}</p>
+                )}
+              </div>
+            )}
+
+            {/* Sync buttons */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleSync('live')}
+                disabled={syncing}
+                className="btn-secondary flex-1 text-sm"
+              >
+                {syncing ? '⏳ Syncing...' : '⚡ Quick sync (live/recent)'}
+              </button>
+              <button
+                onClick={() => handleSync('full')}
+                disabled={syncing}
+                className="btn-primary flex-1 text-sm"
+              >
+                {syncing ? '⏳ Syncing...' : '🔄 Full sync (all fixtures)'}
+              </button>
+            </div>
+            <p className="text-xs text-gray-500">
+              Quick sync = live + recently finished matches (1 API call). Full sync = all WC fixtures + team linking (2-3 calls).
+            </p>
+          </div>
+
+          {/* Last sync result */}
+          {lastSyncResult && (
+            <div className="card space-y-2 border-primary-700">
+              <h3 className="font-medium text-primary-300">Sync result</h3>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                {[
+                  { label: 'Matches updated', value: lastSyncResult.matchesUpdated },
+                  { label: 'Bets scored',     value: lastSyncResult.newlyScored },
+                  { label: 'Teams linked',    value: lastSyncResult.teamsLinked },
+                  { label: 'Errors',          value: lastSyncResult.errors.length },
+                ].map(({ label, value }) => (
+                  <div key={label} className="bg-gray-800 rounded px-3 py-2">
+                    <p className="text-gray-400 text-xs">{label}</p>
+                    <p className="text-white font-bold">{value}</p>
+                  </div>
+                ))}
+              </div>
+              {lastSyncResult.errors.length > 0 && (
+                <div className="bg-red-950 border border-red-800 rounded p-2 text-xs text-red-300 space-y-1">
+                  {lastSyncResult.errors.map((e, i) => <p key={i}>• {e}</p>)}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Setup instructions */}
+          {!syncStatus?.quota && (
+            <div className="card border-yellow-700 space-y-2">
+              <h3 className="font-medium text-yellow-400">⚠️ API key not configured</h3>
+              <ol className="text-sm text-gray-400 space-y-1 list-decimal list-inside">
+                <li>Go to <a href="https://dashboard.api-sports.io/register" target="_blank" rel="noreferrer" className="text-primary-400 underline">dashboard.api-sports.io</a> and create a free account</li>
+                <li>Copy your API key from the dashboard</li>
+                <li>Add to <code className="text-gray-300 bg-gray-800 px-1 rounded">server/.env</code>: <code className="text-gray-300 bg-gray-800 px-1 rounded">FOOTBALL_API_KEY=your_key</code></li>
+                <li>Restart the server</li>
+              </ol>
+            </div>
+          )}
         </div>
       )}
     </div>

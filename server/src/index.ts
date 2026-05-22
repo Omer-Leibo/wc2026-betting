@@ -30,6 +30,8 @@ app.use('/api/admin', adminRouter);
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
+  // Start the live-data background poller after server is ready
+  import('./services/poller').then(({ startPoller }) => startPoller());
 });
 
 export default app;
