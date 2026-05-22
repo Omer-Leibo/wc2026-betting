@@ -14,9 +14,11 @@ enum Role {
 
 enum Stage {
   GROUP
+  ROUND_OF_32
   ROUND_OF_16
   QUARTER_FINAL
   SEMI_FINAL
+  THIRD_PLACE
   FINAL
 }
 
@@ -46,11 +48,12 @@ model User {
 }
 
 model Team {
-  id        Int    @id @default(autoincrement())
-  name      String @unique
-  code      String @unique // e.g. "BRA", "ARG"
-  group     String // "A", "B", ... "L"
-  flagUrl   String?
+  id           Int    @id @default(autoincrement())
+  externalId   Int?   @unique // API-Football team ID
+  name         String @unique
+  code         String @unique // e.g. "BRA", "ARG"
+  group        String // "A", "B", ... "L"
+  flagUrl      String?
 
   homeMatches  Match[] @relation("HomeTeam")
   awayMatches  Match[] @relation("AwayTeam")
@@ -70,6 +73,7 @@ model Player {
 
 model Match {
   id           Int         @id @default(autoincrement())
+  externalId   Int?        @unique // API-Football fixture ID
   homeTeamId   Int
   awayTeamId   Int
   homeTeam     Team        @relation("HomeTeam", fields: [homeTeamId], references: [id])
@@ -85,6 +89,14 @@ model Match {
   updatedAt    DateTime    @updatedAt
 
   bets         MatchBet[]
+}
+
+model SyncLog {
+  id          Int      @id @default(autoincrement())
+  syncedAt    DateTime @default(now())
+  matchesUpdated Int   @default(0)
+  newlyScored    Int   @default(0)
+  error       String?
 }
 
 model MatchBet {
