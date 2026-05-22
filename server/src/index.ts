@@ -25,7 +25,8 @@ import betsRouter from './routes/bets';
 app.use('/api/bets', betsRouter);
 import leaderboardRouter from './routes/leaderboard';
 app.use('/api/leaderboard', leaderboardRouter);
-// app.use('/api/admin', adminRouter);
+import adminRouter from './routes/admin';
+app.use('/api/admin', adminRouter);
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
