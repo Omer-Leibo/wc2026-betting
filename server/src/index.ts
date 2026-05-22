@@ -16,10 +16,11 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Routes (will be added as we build each feature)
-// app.use('/api/auth', authRouter);
-// app.use('/api/matches', matchesRouter);
-// app.use('/api/bets', betsRouter);
+// Routes
+import authRouter from './routes/auth';
+app.use('/api/auth', authRouter);
+// app.use('/api/matches', matchesRouter);  — added in feature/matches
+// app.use('/api/bets', betsRouter);        — added in feature/bets
 // app.use('/api/leaderboard', leaderboardRouter);
 // app.use('/api/admin', adminRouter);
 
