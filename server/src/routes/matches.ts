@@ -123,13 +123,23 @@ router.post('/', authenticate, requireAdmin, async (req: AuthRequest, res: Respo
   res.status(201).json({ match });
 });
 
-// ─── GET /api/matches/teams  (all teams) ──────────────────────────────────────
+// ─── GET /api/matches/meta/teams  (all teams) ────────────────────────────────
 
 router.get('/meta/teams', authenticate, async (_req: AuthRequest, res: Response): Promise<void> => {
   const teams = await prisma.team.findMany({
     orderBy: [{ group: 'asc' }, { name: 'asc' }],
   });
   res.json({ teams });
+});
+
+// ─── GET /api/matches/meta/players  (all players, grouped by team) ────────────
+
+router.get('/meta/players', authenticate, async (_req: AuthRequest, res: Response): Promise<void> => {
+  const players = await prisma.player.findMany({
+    include: { team: { select: { id: true, name: true, code: true, group: true, flagUrl: true } } },
+    orderBy: [{ team: { name: 'asc' } }, { name: 'asc' }],
+  });
+  res.json({ players });
 });
 
 export default router;

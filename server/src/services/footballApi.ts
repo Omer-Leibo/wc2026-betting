@@ -180,6 +180,35 @@ export async function fetchTeams(): Promise<ApiTeam[]> {
 }
 
 /**
+ * Fetch all WC 2026 teams INCLUDING their full squad.
+ * Uses the /competitions/WC/teams endpoint which returns squad arrays.
+ * 1 API call covers all 48 teams.
+ */
+export interface ApiSquadPlayer {
+  id: number;
+  name: string;
+  position: string | null;
+}
+export interface ApiTeamWithSquad extends ApiTeam {
+  squad: ApiSquadPlayer[];
+}
+
+export async function fetchAllSquads(): Promise<ApiTeamWithSquad[]> {
+  const client = getClient();
+  const resp = await client.get(`/competitions/${WC_COMPETITION}/teams`);
+  const raw = resp.data.teams ?? [];
+  return raw.map((t: any) => ({
+    team: { id: t.id, name: t.name, code: t.tla, logo: t.crest },
+    venue: { name: '' },
+    squad: (t.squad ?? []).map((p: any) => ({
+      id:       p.id,
+      name:     p.name,
+      position: p.position ?? null,
+    })),
+  }));
+}
+
+/**
  * football-data.org doesn't expose a quota endpoint.
  * Free plan: 10 req/min (no daily cap).
  * Returns a placeholder so the Admin sync panel still renders.

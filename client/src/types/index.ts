@@ -27,6 +27,7 @@ export interface Team {
 export interface Player {
   id: number;
   name: string;
+  position?: string;
   teamId: number;
   team?: Team;
 }
@@ -39,6 +40,7 @@ export type Stage =
   | 'ROUND_OF_16'
   | 'QUARTER_FINAL'
   | 'SEMI_FINAL'
+  | 'THIRD_PLACE'
   | 'FINAL';
 
 export type MatchStatus = 'UPCOMING' | 'LIVE' | 'FINISHED';
@@ -91,7 +93,7 @@ export interface LeaderboardEntry {
   specialPoints: number;
   bonusPoints: number;
   exactScores: number;
-  correctWinners: number;
+  correctScores: number;
 }
 
 // ─── API responses ────────────────────────────────────────────────────────────

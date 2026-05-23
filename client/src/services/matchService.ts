@@ -1,5 +1,5 @@
 import api from './api';
-import type { Match, Team } from '../types';
+import type { Match, Team, Player } from '../types';
 
 export const matchService = {
   async getAll(): Promise<Match[]> {
@@ -20,6 +20,11 @@ export const matchService = {
   async getTeams(): Promise<Team[]> {
     const { data } = await api.get<{ teams: Team[] }>('/matches/meta/teams');
     return data.teams;
+  },
+
+  async getPlayers(): Promise<Player[]> {
+    const { data } = await api.get<{ players: Player[] }>('/matches/meta/players');
+    return data.players;
   },
 
   async updateResult(id: number, homeScore: number, awayScore: number): Promise<Match> {
