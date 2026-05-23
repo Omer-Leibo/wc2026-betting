@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth';
 import { scoreSpecialBets } from '../services/scoring';
-import { syncAllFixtures, syncLiveFixtures, getLastSync } from '../services/syncService';
+import { syncAllFixtures, syncLiveFixtures, syncPlayers, getLastSync } from '../services/syncService';
 import { fetchQuota } from '../services/footballApi';
 
 const router = Router();
@@ -53,14 +53,13 @@ router.patch('/users/:id/role', async (req: AuthRequest, res: Response): Promise
   res.json({ user });
 });
 
-// ─── GET /api/admin/matches/pending ── matches without results ────────────────
+// ─── GET /api/admin/matches/pending ── all matches (for result entry) ─────────
 
 router.get('/matches/pending', async (_req: AuthRequest, res: Response): Promise<void> => {
   const matches = await prisma.match.findMany({
-    where: { status: { not: 'FINISHED' } },
     include: {
-      homeTeam: { select: { id: true, name: true, code: true } },
-      awayTeam: { select: { id: true, name: true, code: true } },
+      homeTeam: { select: { id: true, name: true, code: true, flagUrl: true } },
+      awayTeam: { select: { id: true, name: true, code: true, flagUrl: true } },
     },
     orderBy: { matchDate: 'asc' },
   });
@@ -143,6 +142,18 @@ router.get('/sync/status', async (_req: AuthRequest, res: Response): Promise<voi
     fetchQuota().catch(() => null),
   ]);
   res.json({ lastSync, quota });
+});
+
+// ─── POST /api/admin/sync/players  (sync squad data from API) ─────────────────
+
+router.post('/sync/players', async (_req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const count = await syncPlayers();
+    res.json({ playersSync: count });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ message: msg });
+  }
 });
 
 export default router;

@@ -1,41 +1,73 @@
 import axios from 'axios';
 
-// ─── API-Football configuration ───────────────────────────────────────────────
-// Docs: https://www.api-football.com/documentation-v3
-// Free tier: 100 requests/day at api-sports.io
+// ─── football-data.org configuration ─────────────────────────────────────────
+// Docs:     https://docs.football-data.org
+// Free tier: 10 req/minute, includes FIFA World Cup — no daily cap
+// Register: https://www.football-data.org/client/register  (instant, no card)
 
-const API_BASE = 'https://v3.football.api-sports.io';
-const WC_LEAGUE_ID = 1;    // FIFA World Cup
-const WC_SEASON = 2026;
+const API_BASE = 'https://api.football-data.org/v4';
+const WC_COMPETITION = 'WC'; // FIFA World Cup (competition ID: 2000)
 
 function getClient() {
   const key = process.env.FOOTBALL_API_KEY;
-  if (!key || key === 'your_api_football_key_here') {
+  if (!key || key === 'your_football_data_key_here') {
     throw new Error('FOOTBALL_API_KEY is not set in .env');
   }
   return axios.create({
     baseURL: API_BASE,
-    headers: { 'x-apisports-key': key },
+    headers: { 'X-Auth-Token': key },
     timeout: 10000,
   });
 }
 
-// ─── Types matching the API-Football v3 response ──────────────────────────────
+// ─── football-data.org raw response types ─────────────────────────────────────
+
+interface FdTeamRef {
+  id: number;
+  name: string;
+  shortName: string;
+  tla: string;
+  crest: string;
+}
+
+interface FdMatch {
+  id: number;
+  utcDate: string;
+  status: string;        // SCHEDULED, TIMED, IN_PLAY, PAUSED, FINISHED, EXTRA_TIME,
+                         // PENALTY_SHOOTOUT, SUSPENDED, POSTPONED, CANCELLED, AWARDED
+  matchday: number | null;
+  stage: string;         // GROUP_STAGE, ROUND_OF_32, LAST_16, QUARTER_FINALS,
+                         // SEMI_FINALS, THIRD_PLACE, FINAL
+  group: string | null;  // GROUP_A … GROUP_L  (null for knockout rounds)
+  homeTeam: FdTeamRef;
+  awayTeam: FdTeamRef;
+  score: {
+    winner: string | null; // HOME_TEAM | AWAY_TEAM | DRAW | null
+    duration: string;      // REGULAR | EXTRA_TIME | PENALTY_SHOOTOUT
+    fullTime:  { home: number | null; away: number | null };
+    halfTime:  { home: number | null; away: number | null };
+  };
+  venue: string | null;
+}
+
+interface FdTeam {
+  id: number;
+  name: string;
+  shortName: string;
+  tla: string;
+  crest: string;
+}
+
+// ─── Public types — same shape as before so syncService.ts needs no changes ───
 
 export interface ApiFixture {
   fixture: {
     id: number;
-    date: string;         // ISO 8601
-    status: {
-      short: string;      // NS, 1H, HT, 2H, ET, P, FT, AET, PEN, PST, CANC, ABD, AWD, WO, LIVE
-      elapsed: number | null;
-    };
+    date: string;
+    status: { short: string; elapsed: number | null };
     venue: { name: string | null; city: string | null };
   };
-  league: {
-    id: number;
-    round: string;        // "Group Stage - 1", "Round of 16", "Quarter-finals", etc.
-  };
+  league: { id: number; round: string };
   teams: {
     home: { id: number; name: string; logo: string };
     away: { id: number; name: string; logo: string };
@@ -53,49 +85,141 @@ export interface ApiTeam {
   venue: { name: string };
 }
 
+// ─── Adapter: football-data.org match → ApiFixture ────────────────────────────
+
+function fdStatusToShort(status: string): string {
+  switch (status) {
+    case 'FINISHED':           return 'FT';
+    case 'AWARDED':            return 'FT';
+    case 'IN_PLAY':            return '1H';
+    case 'PAUSED':             return 'HT';
+    case 'EXTRA_TIME':         return 'ET';
+    case 'PENALTY_SHOOTOUT':   return 'P';
+    default:                   return 'NS'; // SCHEDULED, TIMED, SUSPENDED, POSTPONED, CANCELLED
+  }
+}
+
+function fdStageToRound(stage: string, matchday: number | null): string {
+  switch (stage) {
+    case 'GROUP_STAGE':      return `Group Stage - ${matchday ?? 1}`;
+    case 'ROUND_OF_32':      return 'Round of 32';
+    case 'LAST_16':          return 'Round of 16';
+    case 'ROUND_OF_16':      return 'Round of 16';
+    case 'QUARTER_FINALS':   return 'Quarter-finals';
+    case 'SEMI_FINALS':      return 'Semi-finals';
+    case 'THIRD_PLACE':      return '3rd Place Final';
+    case 'FINAL':            return 'Final';
+    default:                 return stage;
+  }
+}
+
+function mapFdMatchToApiFixture(m: FdMatch): ApiFixture {
+  return {
+    fixture: {
+      id:     m.id,
+      date:   m.utcDate,
+      status: { short: fdStatusToShort(m.status), elapsed: null },
+      venue:  { name: m.venue ?? null, city: null },
+    },
+    league: {
+      id:    2000,
+      round: fdStageToRound(m.stage, m.matchday),
+    },
+    teams: {
+      home: { id: m.homeTeam.id, name: m.homeTeam.name, logo: m.homeTeam.crest },
+      away: { id: m.awayTeam.id, name: m.awayTeam.name, logo: m.awayTeam.crest },
+    },
+    goals: {
+      home: m.score.fullTime.home,
+      away: m.score.fullTime.away,
+    },
+    score: {
+      fulltime:  { home: m.score.fullTime.home,  away: m.score.fullTime.away },
+      extratime: { home: null, away: null },
+      penalty:   { home: null, away: null },
+    },
+  };
+}
+
 // ─── Public API functions ─────────────────────────────────────────────────────
 
-/** Fetch all WC 2026 fixtures (up to 100 at a time; one page covers group stage) */
+/** Fetch all WC 2026 fixtures */
 export async function fetchAllFixtures(): Promise<ApiFixture[]> {
   const client = getClient();
-  const resp = await client.get('/fixtures', {
-    params: { league: WC_LEAGUE_ID, season: WC_SEASON },
-  });
-  return resp.data.response as ApiFixture[];
+  const resp = await client.get(`/competitions/${WC_COMPETITION}/matches`);
+  const matches: FdMatch[] = resp.data.matches ?? [];
+  return matches.map(mapFdMatchToApiFixture);
 }
 
-/** Fetch only live / recently-finished fixtures (cheaper — 1 call) */
+/**
+ * Fetch today's matches that are live or already finished.
+ * 1 request per poll — very quota-friendly.
+ */
 export async function fetchLiveFixtures(): Promise<ApiFixture[]> {
   const client = getClient();
-  const resp = await client.get('/fixtures', {
-    params: { league: WC_LEAGUE_ID, season: WC_SEASON, status: 'LIVE-FT-AET-PEN' },
+  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const resp = await client.get(`/competitions/${WC_COMPETITION}/matches`, {
+    params: { dateFrom: today, dateTo: today },
   });
-  return resp.data.response as ApiFixture[];
+  const matches: FdMatch[] = resp.data.matches ?? [];
+  const liveOrDone = ['IN_PLAY', 'PAUSED', 'EXTRA_TIME', 'PENALTY_SHOOTOUT', 'FINISHED', 'AWARDED'];
+  return matches
+    .filter(m => liveOrDone.includes(m.status))
+    .map(mapFdMatchToApiFixture);
 }
 
-/** Fetch all teams in the WC 2026 */
+/** Fetch all teams registered for the WC 2026 */
 export async function fetchTeams(): Promise<ApiTeam[]> {
   const client = getClient();
-  const resp = await client.get('/teams', {
-    params: { league: WC_LEAGUE_ID, season: WC_SEASON },
-  });
-  return resp.data.response as ApiTeam[];
+  const resp = await client.get(`/competitions/${WC_COMPETITION}/teams`);
+  const teams: FdTeam[] = resp.data.teams ?? [];
+  return teams.map(t => ({
+    team: { id: t.id, name: t.name, code: t.tla, logo: t.crest },
+    venue: { name: '' },
+  }));
 }
 
-/** Check remaining API quota */
-export async function fetchQuota(): Promise<{ current: number; limit: number }> {
+/**
+ * Fetch all WC 2026 teams INCLUDING their full squad.
+ * Uses the /competitions/WC/teams endpoint which returns squad arrays.
+ * 1 API call covers all 48 teams.
+ */
+export interface ApiSquadPlayer {
+  id: number;
+  name: string;
+  position: string | null;
+}
+export interface ApiTeamWithSquad extends ApiTeam {
+  squad: ApiSquadPlayer[];
+}
+
+export async function fetchAllSquads(): Promise<ApiTeamWithSquad[]> {
   const client = getClient();
-  const resp = await client.get('/status');
-  const sub = resp.data.response?.subscription;
-  return {
-    current: sub?.requests?.current ?? 0,
-    limit: sub?.requests?.limit_day ?? 100,
-  };
+  const resp = await client.get(`/competitions/${WC_COMPETITION}/teams`);
+  const raw = resp.data.teams ?? [];
+  return raw.map((t: any) => ({
+    team: { id: t.id, name: t.name, code: t.tla, logo: t.crest },
+    venue: { name: '' },
+    squad: (t.squad ?? []).map((p: any) => ({
+      id:       p.id,
+      name:     p.name,
+      position: p.position ?? null,
+    })),
+  }));
+}
+
+/**
+ * football-data.org doesn't expose a quota endpoint.
+ * Free plan: 10 req/min (no daily cap).
+ * Returns a placeholder so the Admin sync panel still renders.
+ */
+export async function fetchQuota(): Promise<{ current: number; limit: number }> {
+  return { current: 0, limit: 600 }; // 600 = 10/min × 60min
 }
 
 // ─── Mapping helpers ──────────────────────────────────────────────────────────
 
-/** Map API-Football fixture status → our MatchStatus */
+/** Map short status code → our MatchStatus */
 export function mapStatus(apiStatus: string): 'UPCOMING' | 'LIVE' | 'FINISHED' {
   const finished = ['FT', 'AET', 'PEN', 'AWD', 'WO'];
   const live     = ['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE'];
@@ -104,44 +228,35 @@ export function mapStatus(apiStatus: string): 'UPCOMING' | 'LIVE' | 'FINISHED' {
   return 'UPCOMING';
 }
 
-/** Map API-Football round string → our Stage enum */
+/** Map round string → our Stage enum + groupRound */
 export function mapStage(round: string): { stage: string; groupRound: number | null } {
   const r = round.toLowerCase();
-  if (r.includes('group stage') || r.includes('group stage - ')) {
-    // e.g. "Group Stage - 1" or "Group Stage - Matchday 1"
-    const match = round.match(/(\d+)\s*$/);
-    const groupRound = match ? parseInt(match[1]) : null;
-    return { stage: 'GROUP', groupRound };
+  if (r.includes('group stage')) {
+    const m = round.match(/(\d+)\s*$/);
+    return { stage: 'GROUP', groupRound: m ? parseInt(m[1]) : null };
   }
-  if (r.includes('round of 32'))          return { stage: 'ROUND_OF_32',    groupRound: null };
-  if (r.includes('round of 16'))          return { stage: 'ROUND_OF_16',    groupRound: null };
-  if (r.includes('quarter'))              return { stage: 'QUARTER_FINAL',  groupRound: null };
-  if (r.includes('semi'))                 return { stage: 'SEMI_FINAL',     groupRound: null };
-  if (r.includes('3rd') || r.includes('third') || r.includes('place')) return { stage: 'THIRD_PLACE', groupRound: null };
-  if (r.includes('final'))                return { stage: 'FINAL',          groupRound: null };
-  return { stage: 'GROUP', groupRound: null }; // fallback
+  if (r.includes('round of 32'))                                        return { stage: 'ROUND_OF_32',    groupRound: null };
+  if (r.includes('round of 16'))                                        return { stage: 'ROUND_OF_16',    groupRound: null };
+  if (r.includes('quarter'))                                            return { stage: 'QUARTER_FINAL',  groupRound: null };
+  if (r.includes('semi'))                                               return { stage: 'SEMI_FINAL',     groupRound: null };
+  if (r.includes('3rd') || r.includes('third') || r.includes('place')) return { stage: 'THIRD_PLACE',    groupRound: null };
+  if (r.includes('final'))                                              return { stage: 'FINAL',          groupRound: null };
+  return { stage: 'GROUP', groupRound: null };
 }
 
 /**
- * API-Football uses different team names than what we may have seeded.
- * This map normalises common discrepancies.
+ * football-data.org team names vs our seeded names.
+ * Add entries here after the first sync if any names don't match.
  */
 export const TEAM_NAME_ALIASES: Record<string, string> = {
-  // API name → our DB name
   'Korea Republic':         'South Korea',
   'Republic of Korea':      'South Korea',
-  'Ivory Coast':            "Ivory Coast",
-  'Cote d\'Ivoire':         "Ivory Coast",
-  "Côte d'Ivoire":          "Ivory Coast",
+  "Côte d'Ivoire":          'Ivory Coast',
+  "Cote d'Ivoire":          'Ivory Coast',
   'IR Iran':                'Iran',
-  'USA':                    'United States',
-  'United States':          'United States',
-  'New Zealand':            'New Zealand',
-  'Saudi Arabia':           'Saudi Arabia',
-  'South Africa':           'South Africa',
-  'Costa Rica':             'Costa Rica',
   'Bosnia and Herzegovina': 'Bosnia',
-  // Add more as needed after first sync
+  'United States':          'United States',
+  'USA':                    'United States',
 };
 
 export function normaliseTeamName(apiName: string): string {

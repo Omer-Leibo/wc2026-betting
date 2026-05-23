@@ -82,4 +82,9 @@ export const adminService = {
     const { data } = await api.get<SyncStatus>('/admin/sync/status');
     return data;
   },
+
+  async syncPlayers(): Promise<number> {
+    const { data } = await api.post<{ playersSync: number }>('/admin/sync/players');
+    return data.playersSync;
+  },
 };

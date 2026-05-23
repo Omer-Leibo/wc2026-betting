@@ -3,6 +3,7 @@ import {
   fetchAllFixtures,
   fetchLiveFixtures,
   fetchTeams,
+  fetchAllSquads,
   mapStatus,
   mapStage,
   normaliseTeamName,
@@ -205,6 +206,9 @@ async function processOneFixture(fixture: ApiFixture, result: SyncResult): Promi
 // ─── Team resolution ──────────────────────────────────────────────────────────
 
 async function resolveTeam(apiId: number, apiName: string) {
+  // Knockout fixtures have TBD slots with no ID yet — skip them
+  if (!apiId || !apiName || apiName === 'TBD') return null;
+
   // First try by external ID (fastest, most reliable)
   const byId = await prisma.team.findUnique({ where: { externalId: apiId } });
   if (byId) return byId;
@@ -255,4 +259,31 @@ async function logSync(result: SyncResult): Promise<void> {
 
 export async function getLastSync() {
   return prisma.syncLog.findFirst({ orderBy: { syncedAt: 'desc' } });
+}
+
+// ─── Player sync ──────────────────────────────────────────────────────────────
+//
+// Pulls all WC 2026 squads from the API (1 call) and upserts players into the DB.
+// Safe to re-run — uses externalId for deduplication.
+
+export async function syncPlayers(): Promise<number> {
+  const teamsWithSquads = await fetchAllSquads();
+  let synced = 0;
+
+  for (const entry of teamsWithSquads) {
+    // Find the DB team by external API id
+    const dbTeam = await prisma.team.findUnique({ where: { externalId: entry.team.id } });
+    if (!dbTeam) continue; // team not yet linked — run a full fixture sync first
+
+    for (const player of entry.squad) {
+      await prisma.player.upsert({
+        where: { externalId: player.id },
+        update: { name: player.name, position: player.position, teamId: dbTeam.id },
+        create: { externalId: player.id, name: player.name, position: player.position, teamId: dbTeam.id },
+      });
+      synced++;
+    }
+  }
+
+  return synced;
 }

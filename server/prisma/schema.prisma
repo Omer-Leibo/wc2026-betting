@@ -45,6 +45,16 @@ model User {
 
   matchBets   MatchBet[]
   specialBets SpecialBet[]
+  bonusLogs   BonusLog[]
+}
+
+model BonusLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  points    Int
+  reason    String   // e.g. "ACCURACY_R1", "EXACT_LADDER_R2"
+  createdAt DateTime @default(now())
 }
 
 model Team {
@@ -62,13 +72,12 @@ model Team {
 }
 
 model Player {
-  id     Int    @id @default(autoincrement())
-  name   String
-  teamId Int
-  team   Team   @relation(fields: [teamId], references: [id])
-
-  topScorerBets  SpecialBet[] @relation("TopScorerPlayer")
-  topAssistsBets SpecialBet[] @relation("TopAssistsPlayer")
+  id         Int     @id @default(autoincrement())
+  externalId Int?    @unique
+  name       String
+  position   String?
+  teamId     Int
+  team       Team    @relation(fields: [teamId], references: [id])
 }
 
 model Match {
@@ -127,10 +136,8 @@ model SpecialBet {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  user           User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  team           Team?   @relation(fields: [teamId], references: [id])
-  topScorerPlayer  Player? @relation("TopScorerPlayer", fields: [playerId], references: [id])
-  topAssistsPlayer Player? @relation("TopAssistsPlayer", fields: [playerId], references: [id])
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team  Team? @relation(fields: [teamId], references: [id])
 
   @@unique([userId, type])
 }

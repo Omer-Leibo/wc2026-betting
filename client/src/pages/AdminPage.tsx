@@ -4,35 +4,73 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { adminService, type AdminUser, type AdminStats, type SyncStatus, type SyncResult } from '../services/adminService';
 import { matchService } from '../services/matchService';
-import type { Match, Team } from '../types';
+import type { Match, Team, Player } from '../types';
 
 dayjs.extend(relativeTime);
 
 type Tab = 'overview' | 'results' | 'users' | 'special' | 'sync';
 
+// ─── Searchable player picker (same as SpecialBetsPage) ───────────────────────
+function PlayerPicker({ players, value, onChange, placeholder }: {
+  players: Player[]; value: string; onChange: (v: string) => void; placeholder: string;
+}) {
+  const [query, setQuery] = useState(value);
+  const [open, setOpen] = useState(false);
+  const filtered = query.length < 1 ? [] : players.filter(p => p.name.toLowerCase().includes(query.toLowerCase())).slice(0, 20);
+  const pick = (p: Player) => { onChange(p.name); setQuery(p.name); setOpen(false); };
+  return (
+    <div className="relative flex-1">
+      <input type="text" className="input w-full" placeholder={placeholder} value={query}
+        onChange={e => { setQuery(e.target.value); onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} autoComplete="off" />
+      {open && filtered.length > 0 && (
+        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl max-h-56 overflow-y-auto">
+          {filtered.map(p => (
+            <button key={p.id} type="button" className="w-full text-left px-3 py-2 text-sm hover:bg-gray-700 flex items-center justify-between"
+              onMouseDown={() => pick(p)}>
+              <span className="text-white">{p.name}</span>
+              <span className="text-xs text-gray-500 ml-2">{p.team?.name} · {p.position ?? '—'}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Flag component ───────────────────────────────────────────────────────────
+function Flag({ url, name }: { url?: string; name: string }) {
+  if (!url) return null;
+  return <img src={url} alt={name} className="w-5 h-3.5 object-contain inline-block" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />;
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminPage() {
-  const [tab, setTab] = useState<Tab>('overview');
-  const [stats, setStats] = useState<AdminStats | null>(null);
-  const [users, setUsers] = useState<AdminUser[]>([]);
-  const [pendingMatches, setPendingMatches] = useState<Match[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [tab, setTab]               = useState<Tab>('overview');
+  const [stats, setStats]           = useState<AdminStats | null>(null);
+  const [users, setUsers]           = useState<AdminUser[]>([]);
+  const [allMatches, setAllMatches] = useState<Match[]>([]);
+  const [teams, setTeams]           = useState<Team[]>([]);
+  const [players, setPlayers]       = useState<Player[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [showOnlyPending, setShowOnlyPending] = useState(false);
 
   // Result entry state
-  const [resultMatchId, setResultMatchId] = useState<number | null>(null);
-  const [homeScore, setHomeScore] = useState(0);
-  const [awayScore, setAwayScore] = useState(0);
+  const [editingId, setEditingId]   = useState<number | null>(null);
+  const [homeScore, setHomeScore]   = useState('');
+  const [awayScore, setAwayScore]   = useState('');
   const [savingResult, setSavingResult] = useState(false);
 
   // Special results state
-  const [specialType, setSpecialType] = useState<'CHAMPION' | 'TOP_SCORER' | 'TOP_ASSISTS'>('CHAMPION');
+  const [specialType, setSpecialType]   = useState<'CHAMPION' | 'TOP_SCORER' | 'TOP_ASSISTS'>('CHAMPION');
   const [specialTeamId, setSpecialTeamId] = useState<number | ''>('');
   const [specialPlayer, setSpecialPlayer] = useState('');
   const [savingSpecial, setSavingSpecial] = useState(false);
 
   // Sync state
-  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
-  const [syncing, setSyncing] = useState(false);
+  const [syncStatus, setSyncStatus]       = useState<SyncStatus | null>(null);
+  const [syncing, setSyncing]             = useState(false);
+  const [syncingPlayers, setSyncingPlayers] = useState(false);
   const [lastSyncResult, setLastSyncResult] = useState<SyncResult | null>(null);
 
   useEffect(() => {
@@ -41,54 +79,84 @@ export default function AdminPage() {
       adminService.getUsers(),
       adminService.getPendingMatches(),
       matchService.getTeams(),
+      matchService.getPlayers(),
       adminService.getSyncStatus().catch(() => null),
     ])
-      .then(([s, u, m, t, ss]) => {
-        setStats(s); setUsers(u); setPendingMatches(m); setTeams(t);
+      .then(([s, u, m, t, p, ss]) => {
+        setStats(s); setUsers(u); setAllMatches(m); setTeams(t); setPlayers(p);
         if (ss) setSyncStatus(ss);
       })
       .catch(() => toast.error('Failed to load admin data'))
       .finally(() => setLoading(false));
   }, []);
 
+  // ── Sync handlers ────────────────────────────────────────────────────────
   const handleSync = async (type: 'full' | 'live') => {
-    setSyncing(true);
-    setLastSyncResult(null);
+    setSyncing(true); setLastSyncResult(null);
     try {
       const result = type === 'full' ? await adminService.syncAll() : await adminService.syncLive();
       setLastSyncResult(result);
       const ss = await adminService.getSyncStatus().catch(() => null);
       if (ss) setSyncStatus(ss);
-      if (result.errors.length === 0) {
-        toast.success(`Sync complete! ${result.matchesUpdated} matches updated, ${result.newlyScored} scored`);
-      } else {
-        toast.error(`Sync finished with ${result.errors.length} error(s)`);
-      }
-      // Refresh pending matches
-      adminService.getPendingMatches().then(setPendingMatches);
+      toast.success(`Sync complete! ${result.matchesUpdated} matches updated`);
+      adminService.getPendingMatches().then(setAllMatches);
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Sync failed');
-    } finally {
-      setSyncing(false);
-    }
+    } finally { setSyncing(false); }
+  };
+
+  const handleSyncPlayers = async () => {
+    setSyncingPlayers(true);
+    try {
+      const count = await adminService.syncPlayers();
+      toast.success(`${count} players synced!`);
+      matchService.getPlayers().then(setPlayers);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Player sync failed');
+    } finally { setSyncingPlayers(false); }
+  };
+
+  // ── Result entry ─────────────────────────────────────────────────────────
+  const openEdit = (match: Match) => {
+    setEditingId(match.id);
+    setHomeScore(match.homeScore != null ? String(match.homeScore) : '');
+    setAwayScore(match.awayScore != null ? String(match.awayScore) : '');
   };
 
   const handleEnterResult = async () => {
-    if (resultMatchId === null) return;
+    if (editingId === null) return;
+    const h = parseInt(homeScore);
+    const a = parseInt(awayScore);
+    if (isNaN(h) || isNaN(a) || h < 0 || a < 0) { toast.error('Enter valid scores (0 or more)'); return; }
     setSavingResult(true);
     try {
-      await adminService.setMatchResult(resultMatchId, homeScore, awayScore);
-      toast.success('Result saved and bets scored!');
-      setPendingMatches(prev => prev.filter(m => m.id !== resultMatchId));
+      const updated = await adminService.setMatchResult(editingId, h, a);
+      setAllMatches(prev => prev.map(m => m.id === editingId ? { ...m, ...updated } : m));
       setStats(prev => prev ? { ...prev, finishedCount: prev.finishedCount + 1 } : prev);
-      setResultMatchId(null);
+      toast.success('Result saved and bets scored!');
+      setEditingId(null);
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to save result');
-    } finally {
-      setSavingResult(false);
-    }
+    } finally { setSavingResult(false); }
   };
 
+  // ── Special results ──────────────────────────────────────────────────────
+  const handleScoreSpecial = async () => {
+    setSavingSpecial(true);
+    try {
+      await adminService.scoreSpecialBets(
+        specialType,
+        specialType === 'CHAMPION' ? Number(specialTeamId) : undefined,
+        specialType !== 'CHAMPION' ? specialPlayer : undefined,
+      );
+      toast.success(`${specialType} bets scored!`);
+      setSpecialPlayer(''); setSpecialTeamId('');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to score special bets');
+    } finally { setSavingSpecial(false); }
+  };
+
+  // ── Delete user ──────────────────────────────────────────────────────────
   const handleDeleteUser = async (id: number, username: string) => {
     if (!confirm(`Delete user "${username}"? This cannot be undone.`)) return;
     try {
@@ -100,26 +168,12 @@ export default function AdminPage() {
     }
   };
 
-  const handleScoreSpecial = async () => {
-    setSavingSpecial(true);
-    try {
-      await adminService.scoreSpecialBets(
-        specialType,
-        specialType === 'CHAMPION' ? Number(specialTeamId) : undefined,
-        specialType !== 'CHAMPION' ? specialPlayer : undefined,
-      );
-      toast.success(`${specialType} bets scored!`);
-      setSpecialPlayer('');
-      setSpecialTeamId('');
-    } catch (err: any) {
-      toast.error(err.response?.data?.message || 'Failed to score special bets');
-    } finally {
-      setSavingSpecial(false);
-    }
-  };
-
   const tabClass = (t: Tab) =>
     `px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t ? 'bg-primary-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'}`;
+
+  const displayMatches = showOnlyPending
+    ? allMatches.filter(m => m.status !== 'FINISHED')
+    : allMatches;
 
   if (loading) {
     return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
@@ -135,10 +189,10 @@ export default function AdminPage() {
       {/* Tabs */}
       <div className="flex flex-wrap gap-2">
         <button className={tabClass('overview')} onClick={() => setTab('overview')}>Overview</button>
-        <button className={tabClass('results')} onClick={() => setTab('results')}>Enter Results</button>
-        <button className={tabClass('special')} onClick={() => setTab('special')}>Special Results</button>
-        <button className={tabClass('users')} onClick={() => setTab('users')}>Users</button>
-        <button className={tabClass('sync')} onClick={() => setTab('sync')}>
+        <button className={tabClass('results')}  onClick={() => setTab('results')}>Enter Results</button>
+        <button className={tabClass('special')}  onClick={() => setTab('special')}>Special Results</button>
+        <button className={tabClass('users')}    onClick={() => setTab('users')}>Users</button>
+        <button className={tabClass('sync')}     onClick={() => setTab('sync')}>
           🔄 Live Sync
           {syncStatus?.lastSync && (
             <span className="ml-1 text-xs opacity-70">{dayjs(syncStatus.lastSync.syncedAt).fromNow()}</span>
@@ -146,7 +200,7 @@ export default function AdminPage() {
         </button>
       </div>
 
-      {/* ── OVERVIEW ── */}
+      {/* ── OVERVIEW ─────────────────────────────────────────────────────── */}
       {tab === 'overview' && stats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
@@ -163,60 +217,85 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ── ENTER RESULTS ── */}
+      {/* ── ENTER RESULTS ────────────────────────────────────────────────── */}
       {tab === 'results' && (
         <div className="space-y-4">
-          <p className="text-gray-400 text-sm">Select a match and enter the final score. Bets will be scored automatically.</p>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <p className="text-gray-400 text-sm">
+              Click a match to enter or update its score. Bets are scored automatically.
+            </p>
+            <label className="flex items-center gap-2 text-sm text-gray-400 cursor-pointer">
+              <input type="checkbox" checked={showOnlyPending} onChange={e => setShowOnlyPending(e.target.checked)}
+                className="rounded" />
+              Show only pending
+            </label>
+          </div>
 
-          {pendingMatches.length === 0 ? (
-            <div className="card text-center py-8 text-gray-500">All matches have been scored!</div>
+          {displayMatches.length === 0 ? (
+            <div className="card text-center py-8 text-gray-500">No matches to show.</div>
           ) : (
             <div className="space-y-2">
-              {pendingMatches.map(match => (
+              {displayMatches.map(match => (
                 <div key={match.id}
-                  className={`card cursor-pointer transition-all ${resultMatchId === match.id ? 'border-primary-500' : 'hover:border-gray-700'}`}
-                  onClick={() => { setResultMatchId(match.id === resultMatchId ? null : match.id); setHomeScore(0); setAwayScore(0); }}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4 flex-1">
-                      <div className="text-center w-24">
-                        <p className="font-semibold text-white">{match.homeTeam.name}</p>
-                        <p className="text-xs text-gray-500">{match.homeTeam.code}</p>
+                  className={`card cursor-pointer transition-all ${editingId === match.id ? 'border-primary-500' : 'hover:border-gray-700'}`}
+                  onClick={() => editingId === match.id ? setEditingId(null) : openEdit(match)}>
+
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    {/* Teams */}
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <Flag url={match.homeTeam.flagUrl} name={match.homeTeam.name} />
+                        <span className="font-semibold text-white text-sm">{match.homeTeam.name}</span>
                       </div>
-                      <span className="text-gray-600 font-bold">vs</span>
-                      <div className="text-center w-24">
-                        <p className="font-semibold text-white">{match.awayTeam.name}</p>
-                        <p className="text-xs text-gray-500">{match.awayTeam.code}</p>
+                      {match.status === 'FINISHED' ? (
+                        <span className="text-white font-bold px-2">{match.homeScore} – {match.awayScore}</span>
+                      ) : (
+                        <span className="text-gray-600 font-bold px-2">vs</span>
+                      )}
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-white text-sm">{match.awayTeam.name}</span>
+                        <Flag url={match.awayTeam.flagUrl} name={match.awayTeam.name} />
                       </div>
                     </div>
-                    <div className="text-right text-sm text-gray-400">
-                      <p>{match.stage.replace('_', ' ')}</p>
-                      <p>{dayjs(match.matchDate).format('D MMM HH:mm')}</p>
+
+                    {/* Meta */}
+                    <div className="text-right text-sm shrink-0">
+                      <p className={`font-medium text-xs ${match.status === 'FINISHED' ? 'text-gray-500' : match.status === 'LIVE' ? 'text-green-400' : 'text-gray-400'}`}>
+                        {match.status === 'FINISHED' ? 'FT ✓' : match.status === 'LIVE' ? '🔴 LIVE' : dayjs(match.matchDate).format('D MMM HH:mm')}
+                      </p>
+                      <p className="text-xs text-gray-600">{match.stage.replace(/_/g,' ')}</p>
                     </div>
                   </div>
 
-                  {/* Score entry */}
-                  {resultMatchId === match.id && (
-                    <div className="mt-4 pt-4 border-t border-gray-700 flex items-center gap-4 flex-wrap"
+                  {/* Score entry panel */}
+                  {editingId === match.id && (
+                    <div className="mt-4 pt-4 border-t border-gray-700 flex items-center gap-3 flex-wrap"
                       onClick={e => e.stopPropagation()}>
+
+                      {/* Home score */}
                       <div className="flex items-center gap-2">
-                        <label className="text-sm text-gray-400">{match.homeTeam.code}</label>
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => setHomeScore(Math.max(0, homeScore - 1))} className="w-7 h-7 bg-gray-700 rounded hover:bg-gray-600 font-bold">−</button>
-                          <span className="w-8 text-center text-xl font-bold">{homeScore}</span>
-                          <button onClick={() => setHomeScore(homeScore + 1)} className="w-7 h-7 bg-gray-700 rounded hover:bg-gray-600 font-bold">+</button>
-                        </div>
+                        <span className="text-sm text-gray-400">{match.homeTeam.code}</span>
+                        <input type="number" min={0} max={30}
+                          value={homeScore}
+                          onChange={e => setHomeScore(e.target.value)}
+                          className="w-16 text-center text-xl font-bold bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 focus:outline-none focus:border-primary-500 text-white [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                          placeholder="0" />
                       </div>
-                      <span className="text-gray-600 font-bold">–</span>
+
+                      <span className="text-gray-600 font-bold text-lg">–</span>
+
+                      {/* Away score */}
                       <div className="flex items-center gap-2">
-                        <label className="text-sm text-gray-400">{match.awayTeam.code}</label>
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => setAwayScore(Math.max(0, awayScore - 1))} className="w-7 h-7 bg-gray-700 rounded hover:bg-gray-600 font-bold">−</button>
-                          <span className="w-8 text-center text-xl font-bold">{awayScore}</span>
-                          <button onClick={() => setAwayScore(awayScore + 1)} className="w-7 h-7 bg-gray-700 rounded hover:bg-gray-600 font-bold">+</button>
-                        </div>
+                        <input type="number" min={0} max={30}
+                          value={awayScore}
+                          onChange={e => setAwayScore(e.target.value)}
+                          className="w-16 text-center text-xl font-bold bg-gray-800 border border-gray-600 rounded-lg px-2 py-1 focus:outline-none focus:border-primary-500 text-white [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                          placeholder="0" />
+                        <span className="text-sm text-gray-400">{match.awayTeam.code}</span>
                       </div>
+
                       <button onClick={handleEnterResult} disabled={savingResult} className="btn-primary ml-auto">
-                        {savingResult ? 'Saving...' : 'Confirm Result'}
+                        {savingResult ? 'Saving…' : match.status === 'FINISHED' ? 'Update Result' : 'Confirm Result'}
                       </button>
                     </div>
                   )}
@@ -227,11 +306,10 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ── SPECIAL RESULTS ── */}
+      {/* ── SPECIAL RESULTS ──────────────────────────────────────────────── */}
       {tab === 'special' && (
         <div className="card space-y-4 max-w-md">
           <h2 className="font-semibold">Score Special Bets</h2>
-          <p className="text-gray-400 text-sm">Enter the tournament winner to score all special bets.</p>
 
           <div>
             <label className="label">Bet type</label>
@@ -246,7 +324,7 @@ export default function AdminPage() {
             <div>
               <label className="label">Winner team</label>
               <select className="input" value={specialTeamId} onChange={e => setSpecialTeamId(Number(e.target.value))}>
-                <option value="">Select team...</option>
+                <option value="">Select team…</option>
                 {['A','B','C','D','E','F','G','H','I','J','K','L'].map(g => (
                   <optgroup key={g} label={`Group ${g}`}>
                     {teams.filter(t => t.group === g).map(t => (
@@ -258,18 +336,31 @@ export default function AdminPage() {
             </div>
           ) : (
             <div>
-              <label className="label">Player name (must match bets exactly)</label>
-              <input type="text" className="input" placeholder="e.g. Mbappé" value={specialPlayer} onChange={e => setSpecialPlayer(e.target.value)} />
+              <label className="label">Player name</label>
+              {players.length > 0 ? (
+                <PlayerPicker
+                  players={players}
+                  value={specialPlayer}
+                  onChange={setSpecialPlayer}
+                  placeholder="Search player name…"
+                />
+              ) : (
+                <input type="text" className="input" placeholder="Type player name…"
+                  value={specialPlayer} onChange={e => setSpecialPlayer(e.target.value)} />
+              )}
+              <p className="text-xs text-gray-500 mt-1">
+                Must match the player name users selected in their bets.
+              </p>
             </div>
           )}
 
           <button onClick={handleScoreSpecial} disabled={savingSpecial} className="btn-primary w-full">
-            {savingSpecial ? 'Scoring...' : 'Score Bets'}
+            {savingSpecial ? 'Scoring…' : 'Score Bets'}
           </button>
         </div>
       )}
 
-      {/* ── USERS ── */}
+      {/* ── USERS ────────────────────────────────────────────────────────── */}
       {tab === 'users' && (
         <div className="space-y-2">
           {users.map(u => (
@@ -280,11 +371,11 @@ export default function AdminPage() {
                   {u.role === 'ADMIN' && <span className="ml-2 text-xs bg-yellow-600 text-white px-1.5 py-0.5 rounded-full">Admin</span>}
                 </p>
                 <p className="text-sm text-gray-500">{u.email}</p>
-                <p className="text-xs text-gray-600 mt-0.5">{u._count.matchBets} match bets · {u._count.specialBets} special bets · joined {dayjs(u.createdAt).format('D MMM YYYY')}</p>
+                <p className="text-xs text-gray-600 mt-0.5">
+                  {u._count.matchBets} match bets · {u._count.specialBets} special bets · joined {dayjs(u.createdAt).format('D MMM YYYY')}
+                </p>
               </div>
-              <button
-                onClick={() => handleDeleteUser(u.id, u.username)}
-                className="btn-danger text-xs py-1.5 px-3 shrink-0">
+              <button onClick={() => handleDeleteUser(u.id, u.username)} className="btn-danger text-xs py-1.5 px-3 shrink-0">
                 Delete
               </button>
             </div>
@@ -292,25 +383,15 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* ── LIVE SYNC ── */}
+      {/* ── LIVE SYNC ────────────────────────────────────────────────────── */}
       {tab === 'sync' && (
         <div className="space-y-4 max-w-xl">
           <div className="card space-y-3">
             <h2 className="font-semibold">Live Data Sync</h2>
             <p className="text-gray-400 text-sm">
-              Pulls match schedule and results from <span className="text-white">API-Football</span> and updates the database automatically.
-              The server polls every 5 minutes during the tournament. Use the buttons below for an instant refresh.
+              Pulls match schedule and results from <span className="text-white">football-data.org</span> (free tier — 10 req/min).
+              The server polls every 5 minutes during the tournament.
             </p>
-
-            {/* API quota */}
-            {syncStatus?.quota && (
-              <div className="bg-gray-800 rounded-lg px-3 py-2 text-sm flex justify-between">
-                <span className="text-gray-400">API calls today</span>
-                <span className={`font-medium ${syncStatus.quota.current > syncStatus.quota.limit * 0.8 ? 'text-yellow-400' : 'text-green-400'}`}>
-                  {syncStatus.quota.current} / {syncStatus.quota.limit}
-                </span>
-              </div>
-            )}
 
             {/* Last sync */}
             {syncStatus?.lastSync && (
@@ -323,10 +404,6 @@ export default function AdminPage() {
                   <span className="text-gray-400">Matches updated</span>
                   <span className="text-white">{syncStatus.lastSync.matchesUpdated}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Newly scored</span>
-                  <span className="text-white">{syncStatus.lastSync.newlyScored}</span>
-                </div>
                 {syncStatus.lastSync.error && (
                   <p className="text-yellow-400 text-xs mt-1">⚠️ {syncStatus.lastSync.error}</p>
                 )}
@@ -335,27 +412,32 @@ export default function AdminPage() {
 
             {/* Sync buttons */}
             <div className="flex gap-2">
-              <button
-                onClick={() => handleSync('live')}
-                disabled={syncing}
-                className="btn-secondary flex-1 text-sm"
-              >
-                {syncing ? '⏳ Syncing...' : '⚡ Quick sync (live/recent)'}
+              <button onClick={() => handleSync('live')} disabled={syncing} className="btn-secondary flex-1 text-sm">
+                {syncing ? '⏳ Syncing…' : '⚡ Quick sync'}
               </button>
-              <button
-                onClick={() => handleSync('full')}
-                disabled={syncing}
-                className="btn-primary flex-1 text-sm"
-              >
-                {syncing ? '⏳ Syncing...' : '🔄 Full sync (all fixtures)'}
+              <button onClick={() => handleSync('full')} disabled={syncing} className="btn-primary flex-1 text-sm">
+                {syncing ? '⏳ Syncing…' : '🔄 Full sync'}
               </button>
             </div>
-            <p className="text-xs text-gray-500">
-              Quick sync = live + recently finished matches (1 API call). Full sync = all WC fixtures + team linking (2-3 calls).
-            </p>
           </div>
 
-          {/* Last sync result */}
+          {/* Player sync */}
+          <div className="card space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-semibold">Player Squads</h2>
+                <p className="text-gray-400 text-sm">
+                  Sync all 48 squads (~1,200 players) for Special Bet player search. Uses 1 API call.
+                </p>
+              </div>
+              <span className="text-sm text-gray-500">{players.length} players</span>
+            </div>
+            <button onClick={handleSyncPlayers} disabled={syncingPlayers} className="btn-secondary w-full text-sm">
+              {syncingPlayers ? '⏳ Syncing players…' : '👥 Sync Players'}
+            </button>
+          </div>
+
+          {/* Sync result */}
           {lastSyncResult && (
             <div className="card space-y-2 border-primary-700">
               <h3 className="font-medium text-primary-300">Sync result</h3>
@@ -377,19 +459,6 @@ export default function AdminPage() {
                   {lastSyncResult.errors.map((e, i) => <p key={i}>• {e}</p>)}
                 </div>
               )}
-            </div>
-          )}
-
-          {/* Setup instructions */}
-          {!syncStatus?.quota && (
-            <div className="card border-yellow-700 space-y-2">
-              <h3 className="font-medium text-yellow-400">⚠️ API key not configured</h3>
-              <ol className="text-sm text-gray-400 space-y-1 list-decimal list-inside">
-                <li>Go to <a href="https://dashboard.api-sports.io/register" target="_blank" rel="noreferrer" className="text-primary-400 underline">dashboard.api-sports.io</a> and create a free account</li>
-                <li>Copy your API key from the dashboard</li>
-                <li>Add to <code className="text-gray-300 bg-gray-800 px-1 rounded">server/.env</code>: <code className="text-gray-300 bg-gray-800 px-1 rounded">FOOTBALL_API_KEY=your_key</code></li>
-                <li>Restart the server</li>
-              </ol>
             </div>
           )}
         </div>
