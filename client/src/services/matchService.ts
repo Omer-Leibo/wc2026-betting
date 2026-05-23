@@ -31,4 +31,9 @@ export const matchService = {
     const { data } = await api.patch<{ match: Match }>(`/matches/${id}/result`, { homeScore, awayScore });
     return data.match;
   },
+
+  async getFirstKickoff(): Promise<string | null> {
+    const { data } = await api.get<{ firstKickoff: string | null }>('/matches/meta/first-kickoff');
+    return data.firstKickoff;
+  },
 };

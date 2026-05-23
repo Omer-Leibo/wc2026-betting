@@ -142,4 +142,11 @@ router.get('/meta/players', authenticate, async (_req: AuthRequest, res: Respons
   res.json({ players });
 });
 
+// ─── GET /api/matches/meta/first-kickoff  (datetime of earliest match) ────────
+
+router.get('/meta/first-kickoff', authenticate, async (_req: AuthRequest, res: Response): Promise<void> => {
+  const first = await prisma.match.findFirst({ orderBy: { matchDate: 'asc' } });
+  res.json({ firstKickoff: first?.matchDate ?? null });
+});
+
 export default router;

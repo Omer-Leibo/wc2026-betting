@@ -82,7 +82,26 @@ export interface SpecialBet {
   pointsAwarded?: number;
 }
 
+// ─── All Bets ─────────────────────────────────────────────────────────────────
+
+export interface UserBet {
+  userId: number;
+  username: string;
+  predictedHome: number;
+  predictedAway: number;
+  pointsAwarded: number | null;
+}
+
+export interface MatchWithAllBets extends Match {
+  bets: UserBet[];
+}
+
 // ─── Leaderboard ──────────────────────────────────────────────────────────────
+
+export interface SpecialBetDetail {
+  name: string;
+  pointsAwarded: number | null;
+}
 
 export interface LeaderboardEntry {
   rank: number;
@@ -94,6 +113,11 @@ export interface LeaderboardEntry {
   bonusPoints: number;
   exactScores: number;
   correctScores: number;
+  specialBetDetails: {
+    champion:   SpecialBetDetail | null;
+    topScorer:  SpecialBetDetail | null;
+    topAssists: SpecialBetDetail | null;
+  };
 }
 
 // ─── API responses ────────────────────────────────────────────────────────────

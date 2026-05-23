@@ -180,8 +180,16 @@ export async function getLeaderboard() {
           match: { select: { homeScore: true, awayScore: true, status: true } },
         },
       },
-      specialBets: { select: { pointsAwarded: true } },
-      bonusLogs:   { select: { points: true } },
+      specialBets: {
+        select: {
+          type: true,
+          teamId: true,
+          playerName: true,
+          pointsAwarded: true,
+          team: { select: { name: true } },
+        },
+      },
+      bonusLogs: { select: { points: true } },
     },
   });
 
@@ -205,6 +213,10 @@ export async function getLeaderboard() {
       }
     }
 
+    const sbChampion = user.specialBets.find((b: { type: string }) => b.type === 'CHAMPION') as typeof user.specialBets[0] | undefined;
+    const sbScorer   = user.specialBets.find((b: { type: string }) => b.type === 'TOP_SCORER') as typeof user.specialBets[0] | undefined;
+    const sbAssists  = user.specialBets.find((b: { type: string }) => b.type === 'TOP_ASSISTS') as typeof user.specialBets[0] | undefined;
+
     return {
       userId: user.id,
       username: user.username,
@@ -214,6 +226,11 @@ export async function getLeaderboard() {
       totalPoints: matchPoints + specialPoints + bonusPoints,
       exactScores,
       correctScores,
+      specialBetDetails: {
+        champion:  sbChampion ? { name: sbChampion.team?.name ?? '—', pointsAwarded: sbChampion.pointsAwarded } : null,
+        topScorer: sbScorer   ? { name: sbScorer.playerName   ?? '—', pointsAwarded: sbScorer.pointsAwarded   } : null,
+        topAssists: sbAssists ? { name: sbAssists.playerName  ?? '—', pointsAwarded: sbAssists.pointsAwarded  } : null,
+      },
     };
   });
 

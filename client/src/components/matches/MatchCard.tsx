@@ -38,6 +38,8 @@ export default function MatchCard({ match, bet, onBetSaved }: Props) {
   const isFinished = match.status === 'FINISHED';
   const isLive     = match.status === 'LIVE';
   const isUpcoming = match.status === 'UPCOMING';
+  // Betting closes 1 minute before kick-off
+  const bettingOpen = isUpcoming && new Date(match.matchDate).getTime() - Date.now() > 60_000;
 
   const [home, setHome] = useState<number>(bet?.predictedHome ?? 0);
   const [away, setAway] = useState<number>(bet?.predictedAway ?? 0);
@@ -46,7 +48,7 @@ export default function MatchCard({ match, bet, onBetSaved }: Props) {
 
   // Auto-save with 800ms debounce
   const scheduleSave = useCallback((h: number, a: number) => {
-    if (!isUpcoming) return;
+    if (!bettingOpen) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     setSaveState('saving');
     debounceRef.current = setTimeout(async () => {
@@ -92,12 +94,15 @@ export default function MatchCard({ match, bet, onBetSaved }: Props) {
           <span className="text-xs text-gray-500">{match.homeTeam.code}</span>
         </div>
 
-        {/* Centre: actual score (finished/live) or bet inputs (upcoming) */}
+        {/* Centre: actual score (finished/live) or bet inputs (upcoming + open) or lock icon */}
         <div className="flex items-center gap-1 shrink-0">
           {(isFinished || isLive) ? (
             <span className="text-2xl font-bold text-white px-2">
               {match.homeScore} – {match.awayScore}
             </span>
+          ) : !bettingOpen ? (
+            // Upcoming but betting is locked (within 1 min of kickoff)
+            <span className="text-gray-500 text-xl px-3">🔒</span>
           ) : (
             <>
               {/* Home score input */}
@@ -145,7 +150,7 @@ export default function MatchCard({ match, bet, onBetSaved }: Props) {
 
       {/* Bottom row: save state OR bet result */}
       <div className="mt-3 pt-2 border-t border-gray-800 text-center text-xs min-h-[20px]">
-        {isUpcoming && (
+        {bettingOpen && (
           saveState === 'saving' ? (
             <span className="text-gray-500">Saving…</span>
           ) : saveState === 'saved' ? (
@@ -155,6 +160,11 @@ export default function MatchCard({ match, bet, onBetSaved }: Props) {
           ) : (
             <span className="text-gray-600">Enter your prediction above</span>
           )
+        )}
+        {isUpcoming && !bettingOpen && (
+          <span className="text-gray-500">
+            🔒 Locked · {bet ? <span className="text-white">{bet.predictedHome} – {bet.predictedAway}</span> : 'No bet placed'}
+          </span>
         )}
         {isFinished && bet && (
           <span className={betExact ? 'text-yellow-400 font-semibold' : betCorrect ? 'text-green-400' : 'text-red-400'}>
