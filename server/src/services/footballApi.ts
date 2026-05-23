@@ -6,7 +6,9 @@ import axios from 'axios';
 // Register: https://www.football-data.org/client/register  (instant, no card)
 
 const API_BASE = 'https://api.football-data.org/v4';
-const WC_COMPETITION = 'WC'; // FIFA World Cup (competition ID: 2000)
+// Override with FOOTBALL_API_COMPETITION=SA (or any code) in .env for test mode.
+// Leave unset (or set to WC) for normal World Cup operation.
+const COMPETITION = process.env.FOOTBALL_API_COMPETITION ?? 'WC';
 
 function getClient() {
   const key = process.env.FOOTBALL_API_KEY;
@@ -102,6 +104,7 @@ function fdStatusToShort(status: string): string {
 function fdStageToRound(stage: string, matchday: number | null): string {
   switch (stage) {
     case 'GROUP_STAGE':      return `Group Stage - ${matchday ?? 1}`;
+    case 'REGULAR_SEASON':   return `Regular Season - ${matchday ?? 1}`;
     case 'ROUND_OF_32':      return 'Round of 32';
     case 'LAST_16':          return 'Round of 16';
     case 'ROUND_OF_16':      return 'Round of 16';
@@ -109,7 +112,7 @@ function fdStageToRound(stage: string, matchday: number | null): string {
     case 'SEMI_FINALS':      return 'Semi-finals';
     case 'THIRD_PLACE':      return '3rd Place Final';
     case 'FINAL':            return 'Final';
-    default:                 return stage;
+    default:                 return `${stage} - ${matchday ?? 1}`;
   }
 }
 
@@ -146,7 +149,7 @@ function mapFdMatchToApiFixture(m: FdMatch): ApiFixture {
 /** Fetch all WC 2026 fixtures */
 export async function fetchAllFixtures(): Promise<ApiFixture[]> {
   const client = getClient();
-  const resp = await client.get(`/competitions/${WC_COMPETITION}/matches`);
+  const resp = await client.get(`/competitions/${COMPETITION}/matches`);
   const matches: FdMatch[] = resp.data.matches ?? [];
   return matches.map(mapFdMatchToApiFixture);
 }
@@ -158,7 +161,7 @@ export async function fetchAllFixtures(): Promise<ApiFixture[]> {
 export async function fetchLiveFixtures(): Promise<ApiFixture[]> {
   const client = getClient();
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  const resp = await client.get(`/competitions/${WC_COMPETITION}/matches`, {
+  const resp = await client.get(`/competitions/${COMPETITION}/matches`, {
     params: { dateFrom: today, dateTo: today },
   });
   const matches: FdMatch[] = resp.data.matches ?? [];
@@ -171,7 +174,7 @@ export async function fetchLiveFixtures(): Promise<ApiFixture[]> {
 /** Fetch all teams registered for the WC 2026 */
 export async function fetchTeams(): Promise<ApiTeam[]> {
   const client = getClient();
-  const resp = await client.get(`/competitions/${WC_COMPETITION}/teams`);
+  const resp = await client.get(`/competitions/${COMPETITION}/teams`);
   const teams: FdTeam[] = resp.data.teams ?? [];
   return teams.map(t => ({
     team: { id: t.id, name: t.name, code: t.tla, logo: t.crest },
@@ -195,7 +198,7 @@ export interface ApiTeamWithSquad extends ApiTeam {
 
 export async function fetchAllSquads(): Promise<ApiTeamWithSquad[]> {
   const client = getClient();
-  const resp = await client.get(`/competitions/${WC_COMPETITION}/teams`);
+  const resp = await client.get(`/competitions/${COMPETITION}/teams`);
   const raw = resp.data.teams ?? [];
   return raw.map((t: any) => ({
     team: { id: t.id, name: t.name, code: t.tla, logo: t.crest },
@@ -231,7 +234,7 @@ export function mapStatus(apiStatus: string): 'UPCOMING' | 'LIVE' | 'FINISHED' {
 /** Map round string → our Stage enum + groupRound */
 export function mapStage(round: string): { stage: string; groupRound: number | null } {
   const r = round.toLowerCase();
-  if (r.includes('group stage')) {
+  if (r.includes('group stage') || r.includes('regular season')) {
     const m = round.match(/(\d+)\s*$/);
     return { stage: 'GROUP', groupRound: m ? parseInt(m[1]) : null };
   }

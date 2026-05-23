@@ -2,13 +2,18 @@ import { syncLiveFixtures, syncAllFixtures } from './syncService';
 
 const DEFAULT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
-// WC 2026 date window — only poll during the tournament
+// WC 2026 date window — only poll during the tournament.
+// In test mode (FOOTBALL_API_COMPETITION set to something other than WC),
+// the date restriction is bypassed so you can test with live games today.
 const TOURNAMENT_START = new Date('2026-06-11T00:00:00Z');
 const TOURNAMENT_END   = new Date('2026-07-20T00:00:00Z');
 
 let pollerHandle: NodeJS.Timeout | null = null;
 
 function isTournamentActive(): boolean {
+  const testMode = process.env.FOOTBALL_API_COMPETITION &&
+                   process.env.FOOTBALL_API_COMPETITION !== 'WC';
+  if (testMode) return true; // always active when testing another competition
   const now = new Date();
   return now >= TOURNAMENT_START && now <= TOURNAMENT_END;
 }
