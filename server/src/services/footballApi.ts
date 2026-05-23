@@ -146,10 +146,17 @@ function mapFdMatchToApiFixture(m: FdMatch): ApiFixture {
 
 // ─── Public API functions ─────────────────────────────────────────────────────
 
-/** Fetch all WC 2026 fixtures */
+/** Fetch fixtures for the active competition.
+ *  For WC: all matches (104).
+ *  For test competitions (SA, PL, etc.): only from today onwards so we don't
+ *  flood the DB with a full season of historical matches. */
 export async function fetchAllFixtures(): Promise<ApiFixture[]> {
   const client = getClient();
-  const resp = await client.get(`/competitions/${COMPETITION}/matches`);
+  const params: Record<string, string> = {};
+  if (COMPETITION !== 'WC') {
+    params.dateFrom = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  }
+  const resp = await client.get(`/competitions/${COMPETITION}/matches`, { params });
   const matches: FdMatch[] = resp.data.matches ?? [];
   return matches.map(mapFdMatchToApiFixture);
 }
