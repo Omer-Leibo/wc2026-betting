@@ -17,10 +17,11 @@ function sectionKey(match: MatchWithAllBets): string {
   return match.stage;
 }
 
-const SECTION_LABELS: Record<string, string> = {
-  GROUP_1:       '🟢 Group Stage — Matchday 1',
-  GROUP_2:       '🟢 Group Stage — Matchday 2',
-  GROUP_3:       '🟢 Group Stage — Matchday 3',
+const KNOCKOUT_SECTION_ORDER = [
+  'ROUND_OF_32','ROUND_OF_16','QUARTER_FINAL','SEMI_FINAL','THIRD_PLACE','FINAL',
+];
+
+const KNOCKOUT_LABELS: Record<string, string> = {
   ROUND_OF_32:   '🔵 Round of 32',
   ROUND_OF_16:   '🔵 Round of 16',
   QUARTER_FINAL: '🟡 Quarter-finals',
@@ -29,10 +30,13 @@ const SECTION_LABELS: Record<string, string> = {
   FINAL:         '🏆 Final',
 };
 
-const SECTION_ORDER = [
-  'GROUP_1','GROUP_2','GROUP_3',
-  'ROUND_OF_32','ROUND_OF_16','QUARTER_FINAL','SEMI_FINAL','THIRD_PLACE','FINAL',
-];
+function getSectionLabel(key: string): string {
+  if (key.startsWith('GROUP_')) {
+    const md = key.replace('GROUP_', '');
+    return `🟢 Matchday ${md}`;
+  }
+  return KNOCKOUT_LABELS[key] ?? key;
+}
 
 function Flag({ url, name }: { url?: string; name: string }) {
   if (!url) return null;
@@ -147,12 +151,17 @@ export default function AllBetsPage() {
     return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
   }
 
-  // Group matches into sections
+  // Build sections dynamically — handles any matchday number
+  const groupKeys = [...new Set(matches.filter(m => m.stage === 'GROUP').map(sectionKey))]
+    .sort((a, b) => (parseInt(a.replace('GROUP_', '')) || 0) - (parseInt(b.replace('GROUP_', '')) || 0));
+  const knockoutKeys = KNOCKOUT_SECTION_ORDER.filter(k => matches.some(m => sectionKey(m) === k));
+  const dynamicOrder = [...groupKeys, ...knockoutKeys];
+
   const sections: { key: string; label: string; matches: MatchWithAllBets[] }[] = [];
-  for (const key of SECTION_ORDER) {
+  for (const key of dynamicOrder) {
     const sMatches = matches.filter(m => sectionKey(m) === key);
     if (sMatches.length > 0) {
-      sections.push({ key, label: SECTION_LABELS[key] ?? key, matches: sMatches });
+      sections.push({ key, label: getSectionLabel(key), matches: sMatches });
     }
   }
 
