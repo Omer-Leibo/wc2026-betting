@@ -3,6 +3,7 @@ import toast from 'react-hot-toast';
 import { betService } from '../services/betService';
 import { matchService } from '../services/matchService';
 import type { SpecialBet, Team, Player } from '../types';
+import dayjs from 'dayjs';
 
 const GROUPS = ['A','B','C','D','E','F','G','H','I','J','K','L'];
 
@@ -84,6 +85,7 @@ export default function SpecialBetsPage() {
   const [players, setPlayers]           = useState<Player[]>([]);
   const [loading, setLoading]           = useState(true);
   const [saving, setSaving]             = useState<string | null>(null);
+  const [firstKickoff, setFirstKickoff] = useState<string | null>(null);
 
   const [championTeamId, setChampionTeamId] = useState<number | ''>('');
   const [topScorer, setTopScorer]           = useState('');
@@ -94,11 +96,13 @@ export default function SpecialBetsPage() {
       betService.getMySpecialBets(),
       matchService.getTeams(),
       matchService.getPlayers(),
+      matchService.getFirstKickoff(),
     ])
-      .then(([bets, t, p]) => {
+      .then(([bets, t, p, kickoff]) => {
         setSpecialBets(bets);
         setTeams(t);
         setPlayers(p);
+        setFirstKickoff(kickoff);
         const champion = bets.find(b => b.type === 'CHAMPION');
         const scorer   = bets.find(b => b.type === 'TOP_SCORER');
         const assists  = bets.find(b => b.type === 'TOP_ASSISTS');
@@ -144,6 +148,8 @@ export default function SpecialBetsPage() {
   }
 
   const noPlayers = players.length === 0;
+  const tournamentLocked = firstKickoff !== null &&
+    new Date(firstKickoff).getTime() - Date.now() <= 60_000;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -154,8 +160,21 @@ export default function SpecialBetsPage() {
         </p>
       </div>
 
-      {noPlayers && (
-        <div className="card border-yellow-700 text-yellow-400 text-sm p-3">
+      {tournamentLocked && (
+        <div className="card border-red-700 bg-red-900/20 text-red-400 text-sm p-4 flex items-center gap-3">
+          <span className="text-2xl">🔒</span>
+          <div>
+            <p className="font-semibold">Special bets are locked</p>
+            <p className="text-red-400/70 text-xs mt-0.5">
+              The tournament has begun — no more changes allowed.
+              {firstKickoff && ` First kick-off: ${dayjs(firstKickoff).format('D MMM YYYY · HH:mm')}`}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {noPlayers && !tournamentLocked && (
+        <div className="card border-yellow-700 bg-yellow-900/10 text-yellow-400 text-sm p-3">
           ⚠️ Player data not yet synced. Ask the admin to run <strong>Sync Players</strong> in the Admin panel.
         </div>
       )}
@@ -219,7 +238,7 @@ export default function SpecialBetsPage() {
               <button
                 type="submit"
                 className="btn-primary whitespace-nowrap"
-                disabled={isSaving || (isPlayer && noPlayers)}
+                disabled={isSaving || (isPlayer && noPlayers) || tournamentLocked}
               >
                 {isSaving ? 'Saving…' : existing ? 'Update' : 'Save'}
               </button>

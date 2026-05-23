@@ -19,6 +19,13 @@ const specialBetSchema = z.object({
   playerName: z.string().min(2).max(60).optional(),
 });
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Returns true if matchDate is more than 60 seconds in the future */
+function isBettingOpen(matchDate: Date): boolean {
+  return matchDate.getTime() - Date.now() > 60_000;
+}
+
 // ─── GET /api/bets/my  (all current user's bets) ─────────────────────────────
 
 router.get('/my', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
@@ -42,6 +49,52 @@ router.get('/my', authenticate, async (req: AuthRequest, res: Response): Promise
   res.json({ matchBets, specialBets });
 });
 
+// ─── GET /api/bets/all  (all users' bets for matches where betting is closed) ─
+
+router.get('/all', authenticate, async (_req: AuthRequest, res: Response): Promise<void> => {
+  // Betting is closed when: match is not UPCOMING, OR kickoff is within 1 minute
+  const cutoff = new Date(Date.now() + 60_000);
+
+  const matches = await prisma.match.findMany({
+    where: {
+      OR: [
+        { status: { not: 'UPCOMING' } },
+        { matchDate: { lte: cutoff } },
+      ],
+    },
+    include: {
+      homeTeam: { select: { id: true, name: true, code: true, group: true, flagUrl: true } },
+      awayTeam: { select: { id: true, name: true, code: true, group: true, flagUrl: true } },
+      bets: {
+        include: { user: { select: { id: true, username: true } } },
+        orderBy: { user: { username: 'asc' } },
+      },
+    },
+    orderBy: { matchDate: 'asc' },
+  });
+
+  const result = matches.map(m => ({
+    id: m.id,
+    homeTeam: m.homeTeam,
+    awayTeam: m.awayTeam,
+    stage: m.stage,
+    groupRound: m.groupRound,
+    matchDate: m.matchDate,
+    homeScore: m.homeScore,
+    awayScore: m.awayScore,
+    status: m.status,
+    bets: m.bets.map(b => ({
+      userId: b.user.id,
+      username: b.user.username,
+      predictedHome: b.predictedHome,
+      predictedAway: b.predictedAway,
+      pointsAwarded: b.pointsAwarded,
+    })),
+  }));
+
+  res.json({ matches: result });
+});
+
 // ─── POST /api/bets/match/:matchId  (place or update a match bet) ─────────────
 
 router.post('/match/:matchId', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
@@ -54,8 +107,14 @@ router.post('/match/:matchId', authenticate, async (req: AuthRequest, res: Respo
   const matchId = parseInt(req.params.matchId as string);
   const match = await prisma.match.findUnique({ where: { id: matchId } });
   if (!match) { res.status(404).json({ message: 'Match not found' }); return; }
+
   if (match.status !== 'UPCOMING') {
     res.status(409).json({ message: 'Bets are locked for this match' });
+    return;
+  }
+
+  if (!isBettingOpen(match.matchDate)) {
+    res.status(409).json({ message: 'Bets are locked — less than 1 minute to kick-off' });
     return;
   }
 
@@ -74,7 +133,8 @@ router.delete('/match/:matchId', authenticate, async (req: AuthRequest, res: Res
   const matchId = parseInt(req.params.matchId as string);
   const match = await prisma.match.findUnique({ where: { id: matchId } });
   if (!match) { res.status(404).json({ message: 'Match not found' }); return; }
-  if (match.status !== 'UPCOMING') {
+
+  if (match.status !== 'UPCOMING' || !isBettingOpen(match.matchDate)) {
     res.status(409).json({ message: 'Bets are locked for this match' });
     return;
   }
@@ -95,9 +155,15 @@ router.post('/special', authenticate, async (req: AuthRequest, res: Response): P
     return;
   }
 
+  // Lock special bets 1 minute before the first match kicks off
+  const firstMatch = await prisma.match.findFirst({ orderBy: { matchDate: 'asc' } });
+  if (firstMatch && !isBettingOpen(firstMatch.matchDate)) {
+    res.status(409).json({ message: 'Special bets are locked — the tournament has begun' });
+    return;
+  }
+
   const { type, teamId, playerName } = parse.data;
 
-  // Validate: CHAMPION needs teamId, scorer/assists need playerName
   if (type === 'CHAMPION' && !teamId) {
     res.status(400).json({ message: 'Champion bet requires a teamId' }); return;
   }

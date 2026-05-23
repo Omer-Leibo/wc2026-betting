@@ -10,6 +10,7 @@ import MatchesPage from './pages/MatchesPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import AdminPage from './pages/AdminPage';
 import SpecialBetsPage from './pages/SpecialBetsPage';
+import AllBetsPage from './pages/AllBetsPage';
 
 // Layout
 import Layout from './components/common/Layout';
@@ -52,6 +53,7 @@ function App() {
           <Route index element={<DashboardPage />} />
           <Route path="matches" element={<MatchesPage />} />
           <Route path="special-bets" element={<SpecialBetsPage />} />
+          <Route path="all-bets" element={<AllBetsPage />} />
           <Route path="leaderboard" element={<LeaderboardPage />} />
           <Route
             path="admin"

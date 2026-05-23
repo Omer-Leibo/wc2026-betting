@@ -27,6 +27,7 @@ export default function Layout() {
             <NavLink to="/" end className={navClass}>Dashboard</NavLink>
             <NavLink to="/matches" className={navClass}>Matches</NavLink>
             <NavLink to="/special-bets" className={navClass}>Special Bets</NavLink>
+            <NavLink to="/all-bets" className={navClass}>All Bets</NavLink>
             <NavLink to="/leaderboard" className={navClass}>Leaderboard</NavLink>
             {user?.role === 'ADMIN' && (
               <NavLink to="/admin" className={navClass}>Admin</NavLink>
