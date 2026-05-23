@@ -42,7 +42,10 @@ export async function scoreMatch(matchId: number): Promise<void> {
   const actualWinner = getWinner(match.homeScore, match.awayScore);
   const allBets = match.bets;
 
-  // Unique exact bonus: only one person with the exact score gets +1
+  // Wipe any stale unique-exact bonus for this match so re-scoring is clean
+  await prisma.bonusLog.deleteMany({ where: { reason: `UNIQUE_EXACT_${matchId}` } });
+
+  // Unique exact bonus: if exactly one person predicted the right score they get +1
   const exactBetters = allBets.filter(
     (b: { predictedHome: number; predictedAway: number }) =>
       b.predictedHome === match.homeScore && b.predictedAway === match.awayScore
@@ -54,16 +57,25 @@ export async function scoreMatch(matchId: number): Promise<void> {
     const predictedWinner = getWinner(bet.predictedHome, bet.predictedAway);
     const correctWinner = predictedWinner === actualWinner;
 
+    // Base match points only — unique-exact bonus goes to BonusLog separately
     let points = 0;
-    if (isExact) {
-      points = pts.exact + (uniqueExact ? 1 : 0);
-    } else if (correctWinner) {
-      points = pts.winner;
-    }
+    if (isExact)          points = pts.exact;
+    else if (correctWinner) points = pts.winner;
 
     await prisma.matchBet.update({
       where: { id: bet.id },
       data: { pointsAwarded: points },
+    });
+  }
+
+  // Write unique-exact bonus to BonusLog so it shows in the Bonus column
+  if (uniqueExact) {
+    await prisma.bonusLog.create({
+      data: {
+        userId: exactBetters[0].userId,
+        points: 1,
+        reason: `UNIQUE_EXACT_${matchId}`,
+      },
     });
   }
 
