@@ -108,15 +108,15 @@ export default function MatchCard({ match, bet, onBetSaved }: Props) {
               {/* Home score input */}
               <div className="flex flex-col items-center">
                 <button onClick={() => changeHome(clampScore(home + 1))}
-                  className="w-6 h-5 text-xs bg-gray-700 rounded-t hover:bg-gray-600 leading-none">▲</button>
+                  className="w-8 h-7 text-xs bg-gray-700 rounded-t hover:bg-gray-600 active:bg-gray-500 leading-none touch-manipulation">▲</button>
                 <input
                   type="number" min={0} max={30}
                   value={home}
                   onChange={e => changeHome(clampScore(parseInt(e.target.value) || 0))}
-                  className="w-10 h-8 text-center text-lg font-bold bg-gray-800 border border-gray-700 rounded focus:outline-none focus:border-primary-500 text-white [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                  className="w-10 h-9 text-center text-lg font-bold bg-gray-800 border border-gray-700 rounded focus:outline-none focus:border-primary-500 text-white [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                 />
                 <button onClick={() => changeHome(clampScore(home - 1))}
-                  className="w-6 h-5 text-xs bg-gray-700 rounded-b hover:bg-gray-600 leading-none">▼</button>
+                  className="w-8 h-7 text-xs bg-gray-700 rounded-b hover:bg-gray-600 active:bg-gray-500 leading-none touch-manipulation">▼</button>
               </div>
 
               <span className="text-gray-600 font-bold text-lg mx-0.5">–</span>
@@ -124,15 +124,15 @@ export default function MatchCard({ match, bet, onBetSaved }: Props) {
               {/* Away score input */}
               <div className="flex flex-col items-center">
                 <button onClick={() => changeAway(clampScore(away + 1))}
-                  className="w-6 h-5 text-xs bg-gray-700 rounded-t hover:bg-gray-600 leading-none">▲</button>
+                  className="w-8 h-7 text-xs bg-gray-700 rounded-t hover:bg-gray-600 active:bg-gray-500 leading-none touch-manipulation">▲</button>
                 <input
                   type="number" min={0} max={30}
                   value={away}
                   onChange={e => changeAway(clampScore(parseInt(e.target.value) || 0))}
-                  className="w-10 h-8 text-center text-lg font-bold bg-gray-800 border border-gray-700 rounded focus:outline-none focus:border-primary-500 text-white [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                  className="w-10 h-9 text-center text-lg font-bold bg-gray-800 border border-gray-700 rounded focus:outline-none focus:border-primary-500 text-white [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                 />
                 <button onClick={() => changeAway(clampScore(away - 1))}
-                  className="w-6 h-5 text-xs bg-gray-700 rounded-b hover:bg-gray-600 leading-none">▼</button>
+                  className="w-8 h-7 text-xs bg-gray-700 rounded-b hover:bg-gray-600 active:bg-gray-500 leading-none touch-manipulation">▼</button>
               </div>
             </>
           )}
