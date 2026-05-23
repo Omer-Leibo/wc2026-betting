@@ -73,7 +73,20 @@ router.get('/all', authenticate, async (_req: AuthRequest, res: Response): Promi
     orderBy: { matchDate: 'asc' },
   });
 
-  const result = matches.map(m => ({
+  // Fetch unique-exact bonus logs for these matches so we can add the +1
+  // to pointsAwarded in the display (total points per match, not split).
+  const matchIds = matches.map((m: { id: number }) => m.id);
+  const uniqueExactLogs = await prisma.bonusLog.findMany({
+    where: { reason: { in: matchIds.map((id: number) => `UNIQUE_EXACT_${id}`) } },
+  });
+  // key: "matchId_userId" → bonus points
+  const uniqueExactMap = new Map<string, number>();
+  for (const log of uniqueExactLogs) {
+    const matchId = log.reason.replace('UNIQUE_EXACT_', '');
+    uniqueExactMap.set(`${matchId}_${log.userId}`, log.points);
+  }
+
+  const result = matches.map((m: typeof matches[0]) => ({
     id: m.id,
     homeTeam: m.homeTeam,
     awayTeam: m.awayTeam,
@@ -83,12 +96,15 @@ router.get('/all', authenticate, async (_req: AuthRequest, res: Response): Promi
     homeScore: m.homeScore,
     awayScore: m.awayScore,
     status: m.status,
-    bets: m.bets.map(b => ({
+    bets: m.bets.map((b: typeof m.bets[0]) => ({
       userId: b.user.id,
       username: b.user.username,
       predictedHome: b.predictedHome,
       predictedAway: b.predictedAway,
-      pointsAwarded: b.pointsAwarded,
+      // Total points for this match = base points + unique-exact bonus (if any)
+      pointsAwarded: b.pointsAwarded !== null
+        ? b.pointsAwarded + (uniqueExactMap.get(`${m.id}_${b.user.id}`) ?? 0)
+        : null,
     })),
   }));
 
