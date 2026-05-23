@@ -8,7 +8,14 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
+// Allow any origin in development (covers localhost + phone on same WiFi).
+// In production set CLIENT_URL to the deployed frontend domain.
+const allowedOrigin = process.env.CLIENT_URL;
+app.use(cors({
+  origin: allowedOrigin
+    ? allowedOrigin                // production: exact domain from .env
+    : (_origin: string | undefined, cb: (e: Error | null, ok?: boolean) => void) => cb(null, true), // dev: allow all
+}));
 app.use(express.json());
 
 // Health check
