@@ -33,6 +33,7 @@ export default function Layout() {
     { to: '/special-bets',label: '⭐ Special Bets',  end: false },
     { to: '/all-bets',    label: '👥 All Bets',      end: false },
     { to: '/leaderboard', label: '🏆 Leaderboard',   end: false },
+    { to: '/rules',       label: '📋 Rules',          end: false },
     ...(user?.role === 'ADMIN' ? [{ to: '/admin', label: '⚙️ Admin', end: false }] : []),
   ];
 
