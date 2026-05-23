@@ -1,7 +1,9 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3001/api',
+  // Dynamically use the same hostname the page was loaded from,
+  // so it works both on localhost AND when accessed from a phone on the same WiFi.
+  baseURL: import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001/api`,
   headers: { 'Content-Type': 'application/json' },
 });
 
