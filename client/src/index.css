@@ -2,34 +2,244 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   BASE
+   ═══════════════════════════════════════════════════════════════════════════ */
 @layer base {
-  * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
   body {
-    @apply bg-gray-950 text-gray-100 min-h-screen font-sans antialiased;
+    font-family: 'Noto Sans', ui-sans-serif, system-ui, sans-serif;
+    color: #f0f2fa;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+
+    /* Rich, vivid WC background — large color blobs clearly visible */
+    background-color: #07122a;
+    background-image:
+      radial-gradient(ellipse 90% 65% at   0%   0%, rgba(230, 29,  37,  0.28) 0%, transparent 60%),
+      radial-gradient(ellipse 70% 80% at 100% 100%, rgba(42,  57,  141, 0.35) 0%, transparent 60%),
+      radial-gradient(ellipse 55% 45% at  75%  18%, rgba(60,  172, 59,  0.14) 0%, transparent 55%),
+      radial-gradient(ellipse 40% 30% at  25%  85%, rgba(42,  57,  141, 0.20) 0%, transparent 55%);
+    background-attachment: fixed;
+  }
+
+  /*
+   * Heading typography — Barlow Condensed is the closest free equivalent to
+   * the official FWC 2026 font (Pangram Pangram ultra-condensed geometric
+   * black sans-serif).  Weight 800 gives the "bold, sporty, high-impact"
+   * quality of the tournament branding while keeping proper mixed-case support
+   * (unlike Bebas Neue which is all-caps only).
+   */
+  h1 {
+    font-family: 'Barlow Condensed', ui-sans-serif, sans-serif;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    line-height: 1.05;
+  }
+  h2 {
+    font-family: 'Barlow Condensed', ui-sans-serif, sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.025em;
+    line-height: 1.1;
+  }
+  h3, h4, h5, h6 {
+    font-family: 'Barlow Condensed', ui-sans-serif, sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1.15;
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPONENTS
+   ═══════════════════════════════════════════════════════════════════════════ */
 @layer components {
-  .btn-primary {
-    @apply bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+
+  /* ── Cards ─────────────────────────────────────────────────────────────── */
+  /* Glassmorphism: semi-transparent so background color blobs show through */
+  .card {
+    background: rgba(10, 20, 50, 0.70);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(60, 90, 200, 0.25);
+    border-radius: 14px;
+    padding: 1rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
   }
+
+  /* Elevated card — subtle inner glow for key widgets */
+  .card-glow {
+    background: rgba(10, 20, 55, 0.80);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(42, 57, 141, 0.45);
+    border-radius: 14px;
+    padding: 1rem;
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(42, 57, 141, 0.30) inset,
+      0 0 40px rgba(42, 57, 141, 0.12) inset;
+  }
+
+  /* Stat card variants — each gets its own accent color */
+  .stat-card-gold {
+    background: linear-gradient(135deg, rgba(245,166,35,0.18) 0%, rgba(10,20,50,0.85) 60%);
+    border-top: 3px solid #F5A623;
+    border-left: 1px solid rgba(245,166,35,0.25);
+    border-right: 1px solid rgba(245,166,35,0.1);
+    border-bottom: 1px solid rgba(245,166,35,0.1);
+    border-radius: 14px;
+    padding: 1rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 24px rgba(245,166,35,0.15);
+  }
+  .stat-card-blue {
+    background: linear-gradient(135deg, rgba(42,57,141,0.30) 0%, rgba(10,20,50,0.85) 60%);
+    border-top: 3px solid #2A398D;
+    border-left: 1px solid rgba(42,57,141,0.35);
+    border-right: 1px solid rgba(42,57,141,0.1);
+    border-bottom: 1px solid rgba(42,57,141,0.1);
+    border-radius: 14px;
+    padding: 1rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 24px rgba(42,57,141,0.20);
+  }
+  .stat-card-green {
+    background: linear-gradient(135deg, rgba(60,172,59,0.22) 0%, rgba(10,20,50,0.85) 60%);
+    border-top: 3px solid #3CAC3B;
+    border-left: 1px solid rgba(60,172,59,0.30);
+    border-right: 1px solid rgba(60,172,59,0.1);
+    border-bottom: 1px solid rgba(60,172,59,0.1);
+    border-radius: 14px;
+    padding: 1rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 24px rgba(60,172,59,0.15);
+  }
+  .stat-card-red {
+    background: linear-gradient(135deg, rgba(230,29,37,0.22) 0%, rgba(10,20,50,0.85) 60%);
+    border-top: 3px solid #E61D25;
+    border-left: 1px solid rgba(230,29,37,0.30);
+    border-right: 1px solid rgba(230,29,37,0.1);
+    border-bottom: 1px solid rgba(230,29,37,0.1);
+    border-radius: 14px;
+    padding: 1rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 24px rgba(230,29,37,0.15);
+  }
+
+  /* ── Buttons ───────────────────────────────────────────────────────────── */
+  .btn-primary {
+    background: linear-gradient(135deg, #2A398D, #3449ca);
+    color: white;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.08em;
+    padding: 0.5rem 1.25rem;
+    border-radius: 8px;
+    border: none;
+    transition: all 0.2s;
+    box-shadow: 0 4px 16px rgba(42, 57, 141, 0.45);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #3449ca, #4a5de8);
+    box-shadow: 0 6px 24px rgba(42, 57, 141, 0.65);
+    transform: translateY(-1px);
+  }
+  .btn-primary:active:not(:disabled) { transform: translateY(0); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
   .btn-secondary {
-    @apply bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-gray-700/80 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200;
   }
   .btn-danger {
-    @apply bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200;
+    @apply bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200;
   }
-  .card {
-    @apply bg-gray-900 border border-gray-800 rounded-xl p-4;
-  }
+
+  /* ── Forms ─────────────────────────────────────────────────────────────── */
   .input {
-    @apply bg-gray-800 border border-gray-700 text-gray-100 rounded-lg px-3 py-2 w-full focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors;
+    background: rgba(10, 20, 55, 0.80);
+    border: 1px solid rgba(60, 90, 200, 0.30);
+    color: #f0f2fa;
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    width: 100%;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    font-family: 'Noto Sans', sans-serif;
+  }
+  .input::placeholder { color: rgba(112, 128, 200, 0.6); }
+  .input:focus {
+    outline: none;
+    border-color: #2A398D;
+    box-shadow: 0 0 0 3px rgba(42, 57, 141, 0.25);
   }
   .label {
-    @apply block text-sm font-medium text-gray-300 mb-1;
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #94a0d8;
+    margin-bottom: 0.25rem;
+    font-family: 'Noto Sans', sans-serif;
+  }
+
+  /* ── Typography helpers ────────────────────────────────────────────────── */
+  /* Gradient text — WC tricolor: Red → White → Blue */
+  .text-wc {
+    background: linear-gradient(135deg, #E61D25 0%, #ffffff 45%, #2A398D 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  /* Simpler white-to-blue gradient for subtler titles */
+  .text-wc-blue {
+    background: linear-gradient(135deg, #7a9fff 0%, #ffffff 60%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* ── Live badge ────────────────────────────────────────────────────────── */
+  .badge-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    background: rgba(60, 172, 59, 0.15);
+    color: #7ada7c;
+    border: 1px solid rgba(60, 172, 59, 0.40);
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+
+  /* ── WC tricolor bar ───────────────────────────────────────────────────── */
+  .tricolor-bar {
+    height: 4px;
+    background: linear-gradient(
+      to right,
+      #E61D25 0% 33.3%,
+      #3CAC3B 33.3% 66.6%,
+      #2A398D 66.6% 100%
+    );
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════════════════════════════════════ */
+@layer utilities {
+  /* Ultra-large logo / hero numbers — all-caps ultra-condensed (Bebas Neue) */
+  .font-display { font-family: 'Bebas Neue', 'Barlow Condensed', sans-serif; }
+  /* Section headings, nav, stat labels — FWC 2026 condensed style (Barlow Condensed) */
+  .font-heading { font-family: 'Barlow Condensed', ui-sans-serif, sans-serif; }
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: #07122a; }
+::-webkit-scrollbar-thumb  { background: #1e2d5a; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #2A398D; }
