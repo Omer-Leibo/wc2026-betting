@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 160">
+  <defs>
+    <linearGradient id="cupGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#E61D25"/>
+      <stop offset="48%"  stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#2A398D"/>
+    </linearGradient>
+    <linearGradient id="stemGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%"   stop-color="#E61D25"/>
+      <stop offset="100%" stop-color="#2A398D"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Star above cup -->
+  <polygon points="60,3 62.5,10 70,10 64,15 66.5,22 60,17 53.5,22 56,15 50,10 57.5,10"
+    fill="#F5A623" filter="url(#glow)" opacity="0.95"/>
+
+  <!-- Cup rim -->
+  <ellipse cx="60" cy="28" rx="33" ry="7" fill="url(#cupGrad)" opacity="0.9"/>
+
+  <!-- Cup body -->
+  <path d="M27 28 Q22 50 27 68 Q36 92 60 97 Q84 92 93 68 Q98 50 93 28 Z"
+    fill="url(#cupGrad)"/>
+
+  <!-- Left handle -->
+  <path d="M27 36 Q8 36 8 58 Q8 76 27 78"
+    stroke="white" stroke-width="5.5" fill="none" stroke-linecap="round" opacity="0.85"/>
+
+  <!-- Right handle -->
+  <path d="M93 36 Q112 36 112 58 Q112 76 93 78"
+    stroke="white" stroke-width="5.5" fill="none" stroke-linecap="round" opacity="0.85"/>
+
+  <!-- Stem -->
+  <rect x="51" y="97" width="18" height="24" rx="4" fill="url(#stemGrad)" opacity="0.95"/>
+
+  <!-- Base plate -->
+  <rect x="32" y="119" width="56" height="13" rx="5" fill="url(#stemGrad)" opacity="0.95"/>
+
+  <!-- "FIFA WORLD CUP" label -->
+  <text x="60" y="145"
+    text-anchor="middle"
+    font-family="'Arial Black', 'Arial', sans-serif"
+    font-size="8"
+    font-weight="900"
+    fill="white"
+    letter-spacing="1.5"
+    opacity="0.9">FIFA WORLD CUP</text>
+
+  <!-- "2026" big label -->
+  <text x="60" y="160"
+    text-anchor="middle"
+    font-family="'Arial Black', 'Arial', sans-serif"
+    font-size="16"
+    font-weight="900"
+    fill="url(#cupGrad)"
+    letter-spacing="3">2026</text>
+</svg>

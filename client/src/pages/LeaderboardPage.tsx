@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { leaderboardService } from '../services/leaderboardService';
 import { useAuthStore } from '../store/authStore';
+import { useLang } from '../i18n/LanguageContext';
 import type { LeaderboardEntry, SpecialBetDetail } from '../types';
 
 const rankEmoji = (rank: number) => {
@@ -32,6 +33,7 @@ type Tab = 'rankings' | 'special';
 
 export default function LeaderboardPage() {
   const { user } = useAuthStore();
+  const { t } = useLang();
   const [entries, setEntries]       = useState<LeaderboardEntry[]>([]);
   const [hasLiveGames, setHasLive]  = useState(false);
   const [loading, setLoading]       = useState(true);
@@ -60,44 +62,42 @@ export default function LeaderboardPage() {
     return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
   }
 
-  const tabClass = (t: Tab) =>
-    `px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-      tab === t ? 'bg-primary-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'
+  const tabClass = (tab_: Tab) =>
+    `px-4 py-2 rounded-lg font-heading font-bold text-base tracking-wide transition-colors ${
+      tab === tab_ ? 'bg-primary-600 text-white' : 'bg-gray-800/80 text-gray-400 hover:text-white'
     }`;
 
   return (
     <div className="max-w-7xl mx-auto space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold">Leaderboard</h1>
+          <h1 className="text-2xl font-bold">{t.leaderboard.title}</h1>
           {hasLiveGames && (
             <span className="flex items-center gap-1.5 text-xs bg-green-900/40 border border-green-700 text-green-400 px-2.5 py-1 rounded-full font-medium">
-              <span className="animate-pulse">🔴</span> Live
+              <span className="animate-pulse">🔴</span> {t.leaderboard.live}
             </span>
           )}
         </div>
-        <span className="text-sm text-gray-400">{entries.length} participants</span>
+        <span className="text-sm text-gray-400">{entries.length} {t.leaderboard.participants}</span>
       </div>
 
       {hasLiveGames && (
-        <p className="text-xs text-green-400/70">
-          ⚡ Scores update every minute — provisional points shown for ongoing matches
-        </p>
+        <p className="text-xs text-green-400/70">{t.leaderboard.liveNote}</p>
       )}
 
       {/* Tab switcher */}
       <div className="flex gap-2">
         <button className={tabClass('rankings')} onClick={() => setTab('rankings')}>
-          📊 Rankings
+          {t.leaderboard.rankings}
         </button>
         <button className={tabClass('special')} onClick={() => setTab('special')}>
-          ⭐ Special Bets
+          {t.leaderboard.specialBetsTab}
         </button>
       </div>
 
       {entries.length === 0 ? (
         <div className="card text-center py-10">
-          <p className="text-gray-400">No results yet — scores will appear once matches are played.</p>
+          <p className="text-gray-400">{t.leaderboard.noResults}</p>
         </div>
       ) : tab === 'rankings' ? (
         /* ── Rankings table ─────────────────────────────────────────────── */
@@ -106,11 +106,11 @@ export default function LeaderboardPage() {
             <thead>
               <tr className="border-b border-gray-800 bg-gray-900">
                 <th className="px-3 py-3 text-left text-gray-400 font-medium w-10">#</th>
-                <th className="px-3 py-3 text-left text-gray-400 font-medium">Player</th>
-                <th className="px-3 py-3 text-center text-gray-400 font-medium" title="Correct result (not exact)">✓</th>
-                <th className="px-3 py-3 text-center text-gray-400 font-medium" title="Exact scoreline">⭐</th>
-                <th className="px-3 py-3 text-center text-gray-400 font-medium" title="Bonus points">🎯</th>
-                <th className="px-3 py-3 text-center text-white font-semibold">Pts</th>
+                <th className="px-3 py-3 text-left text-gray-400 font-medium">{t.leaderboard.player}</th>
+                <th className="px-3 py-3 text-center text-gray-400 font-medium" title={t.leaderboard.correctResult}>✓</th>
+                <th className="px-3 py-3 text-center text-gray-400 font-medium" title={t.leaderboard.exactScoreline}>⭐</th>
+                <th className="px-3 py-3 text-center text-gray-400 font-medium" title={t.leaderboard.groupBonus}>🎯</th>
+                <th className="px-3 py-3 text-center text-white font-semibold">{t.leaderboard.pts}</th>
               </tr>
             </thead>
             <tbody>
@@ -134,7 +134,9 @@ export default function LeaderboardPage() {
                         {entry.username}
                       </span>
                       {isMe && (
-                        <span className="ml-2 text-xs bg-primary-600 text-white px-1.5 py-0.5 rounded-full">You</span>
+                        <span className="ml-2 text-xs bg-primary-600 text-white px-1.5 py-0.5 rounded-full">
+                          {t.leaderboard.you}
+                        </span>
                       )}
                     </td>
                     <td className="px-3 py-3 text-center text-green-400 font-medium">{entry.correctScores}</td>
@@ -146,7 +148,7 @@ export default function LeaderboardPage() {
                       {hasProvisional ? (
                         <span className="flex flex-col items-center leading-tight">
                           <span className="text-lg font-bold text-white">{liveTotal}</span>
-                          <span className="text-[10px] text-green-400/70">+{entry.provisionalPoints} live</span>
+                          <span className="text-[10px] text-green-400/70">+{entry.provisionalPoints} {t.leaderboard.livePoints}</span>
                         </span>
                       ) : (
                         <span className="text-lg font-bold text-white">{entry.totalPoints}</span>
@@ -164,10 +166,10 @@ export default function LeaderboardPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-800 bg-gray-900">
-                <th className="px-3 py-3 text-left text-gray-400 font-medium">Player</th>
-                <th className="px-3 py-3 text-center text-gray-400 font-medium">🏆 Champion</th>
-                <th className="px-3 py-3 text-center text-gray-400 font-medium">⚽ Top Scorer</th>
-                <th className="px-3 py-3 text-center text-gray-400 font-medium">🎯 Top Assists</th>
+                <th className="px-3 py-3 text-left text-gray-400 font-medium">{t.leaderboard.player}</th>
+                <th className="px-3 py-3 text-center text-gray-400 font-medium">{t.leaderboard.champion}</th>
+                <th className="px-3 py-3 text-center text-gray-400 font-medium">{t.leaderboard.topScorer}</th>
+                <th className="px-3 py-3 text-center text-gray-400 font-medium">{t.leaderboard.topAssists}</th>
               </tr>
             </thead>
             <tbody>
@@ -185,7 +187,9 @@ export default function LeaderboardPage() {
                         {entry.username}
                       </span>
                       {isMe && (
-                        <span className="ml-2 text-xs bg-primary-600 text-white px-1.5 py-0.5 rounded-full">You</span>
+                        <span className="ml-2 text-xs bg-primary-600 text-white px-1.5 py-0.5 rounded-full">
+                          {t.leaderboard.you}
+                        </span>
                       )}
                     </td>
                     <td className="px-3 py-3 text-center">
@@ -207,11 +211,11 @@ export default function LeaderboardPage() {
 
       {/* Legend */}
       <div className="flex flex-wrap gap-3 text-xs text-gray-500">
-        <span><span className="text-green-400">✓</span> Correct result</span>
-        <span><span className="text-yellow-400">⭐</span> Exact scoreline</span>
-        <span><span className="text-purple-400">🎯</span> Group stage bonus</span>
-        {hasLiveGames && <span><span className="text-green-400/70">+X live</span> Provisional points from ongoing matches</span>}
-        <span><span className="text-green-400">✓</span>/<span className="text-red-400">✗</span> on special bets — shown once results announced</span>
+        <span><span className="text-green-400">✓</span> {t.leaderboard.legend.correct}</span>
+        <span><span className="text-yellow-400">⭐</span> {t.leaderboard.legend.exact}</span>
+        <span><span className="text-purple-400">🎯</span> {t.leaderboard.legend.bonus}</span>
+        {hasLiveGames && <span><span className="text-green-400/70">+X {t.leaderboard.livePoints}</span> {t.leaderboard.legend.provisional}</span>}
+        <span><span className="text-green-400">✓</span>/<span className="text-red-400">✗</span> {t.leaderboard.legend.specialResults}</span>
       </div>
     </div>
   );

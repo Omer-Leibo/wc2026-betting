@@ -3,6 +3,7 @@ import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
 import { betService } from '../services/betService';
 import { useAuthStore } from '../store/authStore';
+import { useLang } from '../i18n/LanguageContext';
 import type { MatchWithAllBets } from '../types';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -21,30 +22,13 @@ const KNOCKOUT_SECTION_ORDER = [
   'ROUND_OF_32','ROUND_OF_16','QUARTER_FINAL','SEMI_FINAL','THIRD_PLACE','FINAL',
 ];
 
-const KNOCKOUT_LABELS: Record<string, string> = {
-  ROUND_OF_32:   '🔵 Round of 32',
-  ROUND_OF_16:   '🔵 Round of 16',
-  QUARTER_FINAL: '🟡 Quarter-finals',
-  SEMI_FINAL:    '🟠 Semi-finals',
-  THIRD_PLACE:   '⚪ 3rd Place Final',
-  FINAL:         '🏆 Final',
-};
-
-function getSectionLabel(key: string): string {
-  if (key.startsWith('GROUP_')) {
-    const md = key.replace('GROUP_', '');
-    return `🟢 Matchday ${md}`;
-  }
-  return KNOCKOUT_LABELS[key] ?? key;
-}
-
 /** Approximate in-game minute from kickoff time */
-function getLiveMinute(matchDate: string): string {
+function getLiveMinute(matchDate: string, htLabel: string): string {
   const kickoff = new Date(matchDate).getTime();
   const elapsed = Math.floor((Date.now() - kickoff) / 60_000);
   if (elapsed <= 0)  return 'LIVE';
   if (elapsed <= 45) return `${elapsed}'`;
-  if (elapsed <= 60) return 'HT';
+  if (elapsed <= 60) return htLabel;
   const min2 = elapsed - 15;
   if (min2 <= 90)    return `${min2}'`;
   return `90+${min2 - 90}'`;
@@ -61,6 +45,7 @@ function Flag({ url, name }: { url?: string; name: string }) {
 // ─── Match block ──────────────────────────────────────────────────────────────
 
 function MatchBlock({ match, myUserId }: { match: MatchWithAllBets; myUserId?: number }) {
+  const { t } = useLang();
   const isFinished = match.status === 'FINISHED';
   const isLive     = match.status === 'LIVE';
   const hasScore   = match.homeScore != null && match.awayScore != null;
@@ -74,7 +59,7 @@ function MatchBlock({ match, myUserId }: { match: MatchWithAllBets; myUserId?: n
     return () => clearInterval(timer);
   }, [isLive]);
 
-  const liveMinute = isLive ? getLiveMinute(match.matchDate) : null;
+  const liveMinute = isLive ? getLiveMinute(match.matchDate, t.matchCard.ht) : null;
 
   return (
     <div className="card space-y-3">
@@ -99,14 +84,14 @@ function MatchBlock({ match, myUserId }: { match: MatchWithAllBets; myUserId?: n
           )}
           <div className="text-[10px] mt-0.5">
             {isFinished ? (
-              <span className="text-gray-600">FT</span>
+              <span className="text-gray-600">{t.matchCard.ft}</span>
             ) : isLive ? (
               <span className="flex items-center justify-center gap-1 text-green-400 font-semibold">
                 <span className="animate-pulse">🔴</span>
                 <span>{liveMinute}</span>
               </span>
             ) : (
-              <span className="text-gray-600">Locked</span>
+              <span className="text-gray-600">{t.matchCard.locked}</span>
             )}
           </div>
         </div>
@@ -120,7 +105,7 @@ function MatchBlock({ match, myUserId }: { match: MatchWithAllBets; myUserId?: n
 
       {/* Bets list */}
       {match.bets.length === 0 ? (
-        <p className="text-xs text-gray-600 text-center">No bets placed for this match</p>
+        <p className="text-xs text-gray-600 text-center">{t.allBets.noBet}</p>
       ) : (
         <div className="border-t border-gray-800 pt-2 space-y-1">
           {match.bets.map(bet => {
@@ -131,11 +116,11 @@ function MatchBlock({ match, myUserId }: { match: MatchWithAllBets; myUserId?: n
               const isExact = bet.predictedHome === match.homeScore && bet.predictedAway === match.awayScore;
               const correctWin = !isExact && getWinner(bet.predictedHome, bet.predictedAway) === actualWinner;
               if (isExact) {
-                resultLabel = <span className="text-yellow-400">⭐ Exact{bet.pointsAwarded ? ` +${bet.pointsAwarded}` : ''}</span>;
+                resultLabel = <span className="text-yellow-400">⭐ {t.matchCard.exact}{bet.pointsAwarded ? ` +${bet.pointsAwarded}` : ''}</span>;
               } else if (correctWin) {
-                resultLabel = <span className="text-green-400">✓ Correct{bet.pointsAwarded ? ` +${bet.pointsAwarded}` : ''}</span>;
+                resultLabel = <span className="text-green-400">✓ {t.matchCard.correct}{bet.pointsAwarded ? ` +${bet.pointsAwarded}` : ''}</span>;
               } else {
-                resultLabel = <span className="text-red-400">✗ Wrong</span>;
+                resultLabel = <span className="text-red-400">✗ {t.matchCard.wrong}</span>;
               }
             }
 
@@ -144,11 +129,11 @@ function MatchBlock({ match, myUserId }: { match: MatchWithAllBets; myUserId?: n
               const isExact = bet.predictedHome === match.homeScore && bet.predictedAway === match.awayScore;
               const correctWin = !isExact && getWinner(bet.predictedHome, bet.predictedAway) === actualWinner;
               if (isExact) {
-                resultLabel = <span className="text-yellow-300 opacity-60">⭐ Exact?</span>;
+                resultLabel = <span className="text-yellow-300 opacity-60">⭐ {t.allBets.exact}</span>;
               } else if (correctWin) {
-                resultLabel = <span className="text-green-300 opacity-60">✓ Winning?</span>;
+                resultLabel = <span className="text-green-300 opacity-60">✓ {t.allBets.winning}</span>;
               } else {
-                resultLabel = <span className="text-red-300 opacity-60">✗ Losing?</span>;
+                resultLabel = <span className="text-red-300 opacity-60">✗ {t.allBets.losing}</span>;
               }
             }
 
@@ -160,7 +145,7 @@ function MatchBlock({ match, myUserId }: { match: MatchWithAllBets; myUserId?: n
                 }`}
               >
                 <span className={`font-medium ${isMe ? 'text-primary-300' : 'text-gray-300'}`}>
-                  {bet.username}{isMe && <span className="ml-1 text-[10px] text-primary-400">(you)</span>}
+                  {bet.username}{isMe && <span className="ml-1 text-[10px] text-primary-400">({t.leaderboard.you})</span>}
                 </span>
                 <div className="flex items-center gap-3">
                   <span className="text-white font-semibold tabular-nums">
@@ -181,6 +166,7 @@ function MatchBlock({ match, myUserId }: { match: MatchWithAllBets; myUserId?: n
 
 export default function AllBetsPage() {
   const { user } = useAuthStore();
+  const { t } = useLang();
   const [matches, setMatches] = useState<MatchWithAllBets[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -204,6 +190,24 @@ export default function AllBetsPage() {
     return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
   }
 
+  // Translated knockout labels (reactive to language)
+  const KNOCKOUT_LABELS: Record<string, string> = {
+    ROUND_OF_32:   t.matches.roundOf32,
+    ROUND_OF_16:   t.matches.roundOf16,
+    QUARTER_FINAL: t.matches.quarterFinal,
+    SEMI_FINAL:    t.matches.semiFinal,
+    THIRD_PLACE:   t.matches.thirdPlace,
+    FINAL:         t.matches.final,
+  };
+
+  function getSectionLabel(key: string): string {
+    if (key.startsWith('GROUP_')) {
+      const md = key.replace('GROUP_', '');
+      return `🟢 ${t.matches.matchday} ${md}`;
+    }
+    return KNOCKOUT_LABELS[key] ?? key;
+  }
+
   // Build sections dynamically — handles any matchday number
   const groupKeys = [...new Set(matches.filter(m => m.stage === 'GROUP').map(sectionKey))]
     .sort((a, b) => (parseInt(a.replace('GROUP_', '')) || 0) - (parseInt(b.replace('GROUP_', '')) || 0));
@@ -224,21 +228,22 @@ export default function AllBetsPage() {
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
         <div className="flex items-center gap-3 flex-wrap">
-          <h1 className="text-2xl font-bold">All Bets</h1>
+          <h1 className="text-2xl font-bold">{t.allBets.title}</h1>
           {hasLive && (
             <span className="flex items-center gap-1.5 text-xs bg-green-900/40 border border-green-700 text-green-400 px-2.5 py-1 rounded-full font-medium">
-              <span className="animate-pulse">🔴</span> Live now
+              <span className="animate-pulse">🔴</span> {t.allBets.live}
             </span>
           )}
         </div>
         <p className="text-gray-400 mt-1 text-sm">
+          {/* Keep English for now — complex descriptive text */}
           Everyone's predictions — visible once betting closes for each match (1 minute before kick-off).
         </p>
       </div>
 
       {matches.length === 0 ? (
         <div className="card text-center py-10">
-          <p className="text-gray-400">No closed matches yet — check back once the first game is about to kick off.</p>
+          <p className="text-gray-400">{t.allBets.noMatches}</p>
         </div>
       ) : (
         sections.map(({ key, label, matches: sMatches }) => (

@@ -3,13 +3,14 @@ import toast from 'react-hot-toast';
 import { matchService } from '../services/matchService';
 import { betService } from '../services/betService';
 import MatchCard from '../components/matches/MatchCard';
+import { useLang } from '../i18n/LanguageContext';
 import type { Match, MatchBet } from '../types';
 
 const GROUPS = ['A','B','C','D','E','F','G','H','I','J','K','L'];
 
 type View = 'ALL' | 'GROUP' | 'KNOCKOUT';
 
-// Section label for the "All Games" chronological list
+// Section key — language-independent
 function sectionKey(match: Match): string {
   if (match.stage === 'GROUP') return `GROUP_${match.groupRound ?? 1}`;
   return match.stage;
@@ -17,24 +18,8 @@ function sectionKey(match: Match): string {
 
 const KNOCKOUT_SECTION_ORDER = ['ROUND_OF_32','ROUND_OF_16','QUARTER_FINAL','SEMI_FINAL','THIRD_PLACE','FINAL'];
 
-const KNOCKOUT_LABELS: Record<string, string> = {
-  ROUND_OF_32:   '🔵 Round of 32',
-  ROUND_OF_16:   '🔵 Round of 16',
-  QUARTER_FINAL: '🟡 Quarter-finals',
-  SEMI_FINAL:    '🟠 Semi-finals',
-  THIRD_PLACE:   '⚪ 3rd Place Final',
-  FINAL:         '🏆 Final',
-};
-
-function getSectionLabel(key: string): string {
-  if (key.startsWith('GROUP_')) {
-    const md = key.replace('GROUP_', '');
-    return `🟢 Matchday ${md}`;
-  }
-  return KNOCKOUT_LABELS[key] ?? key;
-}
-
 export default function MatchesPage() {
+  const { t } = useLang();
   const [matches, setMatches]         = useState<Match[]>([]);
   const [bets, setBets]               = useState<MatchBet[]>([]);
   const [loading, setLoading]         = useState(true);
@@ -47,6 +32,24 @@ export default function MatchesPage() {
       .catch(() => toast.error('Failed to load data'))
       .finally(() => setLoading(false));
   }, []);
+
+  // Translated knockout labels (reactive to language)
+  const KNOCKOUT_LABELS: Record<string, string> = {
+    ROUND_OF_32:   t.matches.roundOf32,
+    ROUND_OF_16:   t.matches.roundOf16,
+    QUARTER_FINAL: t.matches.quarterFinal,
+    SEMI_FINAL:    t.matches.semiFinal,
+    THIRD_PLACE:   t.matches.thirdPlace,
+    FINAL:         t.matches.final,
+  };
+
+  function getSectionLabel(key: string): string {
+    if (key.startsWith('GROUP_')) {
+      const md = key.replace('GROUP_', '');
+      return `🟢 ${t.matches.matchday} ${md}`;
+    }
+    return KNOCKOUT_LABELS[key] ?? key;
+  }
 
   const betByMatchId = Object.fromEntries(bets.map(b => [b.matchId, b]));
 
@@ -69,7 +72,6 @@ export default function MatchesPage() {
     (a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime()
   );
 
-  // Build ordered section list dynamically — handles any matchday number
   const groupKeys = [...new Set(allSorted.filter(m => m.stage === 'GROUP').map(sectionKey))]
     .sort((a, b) => (parseInt(a.replace('GROUP_', '')) || 0) - (parseInt(b.replace('GROUP_', '')) || 0));
   const knockoutKeys = KNOCKOUT_SECTION_ORDER.filter(k =>
@@ -96,16 +98,16 @@ export default function MatchesPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Matches</h1>
-        <p className="text-sm text-gray-400">{bets.length} bets placed</p>
+        <h1 className="text-2xl font-bold">{t.matches.title}</h1>
+        <p className="text-sm text-gray-400">{bets.length} {t.matches.betsPlaced}</p>
       </div>
 
       {/* View selector */}
       <div className="flex gap-2 flex-wrap">
         {(['ALL','GROUP','KNOCKOUT'] as View[]).map(v => (
           <button key={v} onClick={() => setView(v)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${view === v ? 'bg-primary-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'}`}>
-            {v === 'ALL' ? 'All Games' : v === 'GROUP' ? 'By Group' : 'Knockout'}
+            className={`px-4 py-2 rounded-lg font-heading font-bold text-base tracking-wide transition-colors ${view === v ? 'bg-primary-600 text-white' : 'bg-gray-800/80 text-gray-400 hover:text-white'}`}>
+            {v === 'ALL' ? t.matches.allGames : v === 'GROUP' ? t.matches.byGroup : t.matches.knockout}
           </button>
         ))}
       </div>
@@ -114,7 +116,7 @@ export default function MatchesPage() {
       {view === 'ALL' && (
         <div className="space-y-8">
           {sections.length === 0 ? (
-            <p className="text-gray-500">No matches available yet.</p>
+            <p className="text-gray-500">{t.matches.noMatches}</p>
           ) : (
             sections.map(({ key, label, matches: sMatches }) => (
               <div key={key} className="space-y-3">
@@ -150,9 +152,9 @@ export default function MatchesPage() {
           </div>
 
           <div className="space-y-3">
-            <h2 className="text-lg font-semibold text-gray-300">Group {selectedGroup}</h2>
+            <h2 className="text-lg font-semibold text-gray-300">{t.matches.group} {selectedGroup}</h2>
             {groupMatches.length === 0 ? (
-              <p className="text-gray-500">No matches for this group yet.</p>
+              <p className="text-gray-500">{t.matches.noMatches}</p>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {groupMatches.map(match => (
@@ -173,7 +175,7 @@ export default function MatchesPage() {
       {view === 'KNOCKOUT' && (
         <div className="space-y-3">
           {knockoutMatches.length === 0 ? (
-            <p className="text-gray-500">Knockout matches will appear after the group stage.</p>
+            <p className="text-gray-500">{t.matches.noMatches}</p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {knockoutMatches.map(match => (

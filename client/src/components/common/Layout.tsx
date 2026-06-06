@@ -1,87 +1,168 @@
 import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
+import { useLang } from '../../i18n/LanguageContext';
+
+// ── Language toggle button ─────────────────────────────────────────────────────
+function LangToggle() {
+  const { lang, setLang } = useLang();
+  return (
+    <button
+      onClick={() => setLang(lang === 'en' ? 'he' : 'en')}
+      title={lang === 'en' ? 'Switch to Hebrew' : 'עבור לאנגלית'}
+      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-heading font-bold
+                 tracking-wider transition-all border"
+      style={{
+        background: 'rgba(42,57,141,0.25)',
+        borderColor: 'rgba(42,57,141,0.5)',
+        color: '#94a0d8',
+      }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLElement).style.background = 'rgba(42,57,141,0.50)';
+        (e.currentTarget as HTMLElement).style.color = '#ffffff';
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLElement).style.background = 'rgba(42,57,141,0.25)';
+        (e.currentTarget as HTMLElement).style.color = '#94a0d8';
+      }}
+    >
+      {lang === 'en' ? '🇮🇱 עב' : '🇬🇧 EN'}
+    </button>
+  );
+}
 
 export default function Layout() {
-  const { user, logout } = useAuthStore();
-  const navigate = useNavigate();
+  const { user, logout }  = useAuthStore();
+  const navigate           = useNavigate();
+  const { t, isRTL }       = useLang();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
-  const navClass = ({ isActive }: { isActive: boolean }) =>
-    `px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-      isActive
-        ? 'bg-primary-600 text-white'
-        : 'text-gray-400 hover:text-white hover:bg-gray-800'
-    }`;
-
-  // Mobile nav link — closes menu on tap
-  const mobileNavClass = ({ isActive }: { isActive: boolean }) =>
-    `block px-4 py-3 rounded-lg text-base font-medium transition-colors ${
-      isActive
-        ? 'bg-primary-600 text-white'
-        : 'text-gray-300 hover:text-white hover:bg-gray-800'
-    }`;
+  const handleLogout = () => { logout(); navigate('/login'); };
 
   const links = [
-    { to: '/',            label: '🏠 Dashboard',    end: true  },
-    { to: '/matches',     label: '📅 Matches',       end: false },
-    { to: '/special-bets',label: '⭐ Special Bets',  end: false },
-    { to: '/all-bets',    label: '👥 All Bets',      end: false },
-    { to: '/leaderboard', label: '🏆 Leaderboard',   end: false },
-    { to: '/rules',       label: '📋 Rules',          end: false },
-    ...(user?.role === 'ADMIN' ? [{ to: '/admin', label: '⚙️ Admin', end: false }] : []),
+    { to: '/',             label: t.nav.dashboard,   end: true  },
+    { to: '/matches',      label: t.nav.matches,      end: false },
+    { to: '/special-bets', label: t.nav.specialBets,  end: false },
+    { to: '/all-bets',     label: t.nav.allBets,      end: false },
+    { to: '/leaderboard',  label: t.nav.leaderboard,  end: false },
+    { to: '/rules',        label: t.nav.rules,        end: false },
+    ...(user?.role === 'ADMIN'
+      ? [{ to: '/admin', label: t.nav.admin, end: false }]
+      : []),
+  ];
+
+  const LINK_COLORS = [
+    'from-red-500 to-red-700',
+    'from-blue-500 to-primary-700',
+    'from-gold-500 to-gold-700',
+    'from-green-500 to-green-700',
+    'from-gold-400 to-yellow-600',
+    'from-gray-400 to-gray-600',
+    'from-primary-400 to-primary-600',
   ];
 
   return (
     <div className="min-h-screen flex flex-col">
+
+      {/* Tricolor stripe */}
+      <div className="tricolor-bar w-full" />
+
       {/* Navbar */}
-      <nav className="bg-gray-900 border-b border-gray-800 px-4 py-3">
-        <div className="flex items-center justify-between">
+      <nav
+        className="sticky top-0 z-50 px-4 py-3 border-b"
+        style={{
+          background: 'linear-gradient(135deg, rgba(5,10,30,0.97) 0%, rgba(12,24,65,0.97) 100%)',
+          borderBottomColor: 'rgba(42,57,141,0.4)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+        }}
+      >
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
+
           {/* Logo */}
-          <span className="text-xl font-bold text-white shrink-0">⚽ WC2026</span>
+          <div className={`flex items-center gap-3 shrink-0 ${isRTL ? 'flex-row-reverse' : ''}`}>
+            <img
+              src="/wc2026-official-logo.png"
+              alt="FIFA World Cup 2026"
+              className="h-12 w-auto"
+              style={{ filter: 'drop-shadow(0 0 10px rgba(245,166,35,0.40))' }}
+            />
+            <div className={`flex flex-col leading-tight ${isRTL ? 'items-end' : ''}`}>
+              <span
+                className="font-display text-xl tracking-widest uppercase"
+                style={{
+                  background: 'linear-gradient(135deg, #E61D25 0%, #ffffff 50%, #2A398D 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                  lineHeight: 1.1,
+                }}
+              >
+                {t.nav.appName}
+              </span>
+              <span
+                className="font-display text-3xl tracking-[0.18em] uppercase text-white"
+                style={{ lineHeight: 1 }}
+              >
+                {t.nav.appYear}
+              </span>
+              <span className="text-[9px] tracking-[0.22em] uppercase text-gray-500 mt-0.5 hidden sm:block">
+                {t.nav.subtitle}
+              </span>
+            </div>
+          </div>
 
           {/* Desktop links */}
-          <div className="hidden md:flex items-center gap-1">
-            {links.map(l => (
-              <NavLink key={l.to} to={l.to} end={l.end} className={navClass}>
+          <div className="hidden md:flex items-center gap-0.5">
+            {links.map((l, i) => (
+              <NavLink
+                key={l.to}
+                to={l.to}
+                end={l.end}
+                className={({ isActive }) =>
+                  isActive
+                    ? `px-3 py-1.5 rounded-lg text-sm font-heading font-bold tracking-wide transition-all text-white bg-gradient-to-r ${LINK_COLORS[i] ?? 'from-primary-600 to-primary-800'} shadow-lg`
+                    : 'px-3 py-1.5 rounded-lg text-sm font-heading font-semibold tracking-wide transition-all text-gray-400 hover:text-white hover:bg-white/10'
+                }
+              >
                 {l.label}
               </NavLink>
             ))}
           </div>
 
           {/* Right side */}
-          <div className="flex items-center gap-2">
-            {/* Username — desktop only */}
+          <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
+            <LangToggle />
+
             <span className="hidden md:inline text-sm text-gray-400">
               {user?.username}
               {user?.role === 'ADMIN' && (
-                <span className="ml-2 text-xs bg-primary-600 text-white px-2 py-0.5 rounded-full">Admin</span>
+                <span
+                  className="text-xs text-white px-2 py-0.5 rounded-full font-semibold"
+                  style={{ background: 'linear-gradient(135deg,#E61D25,#2A398D)', marginInlineStart: '0.5rem' }}
+                >
+                  {t.common.admin}
+                </span>
               )}
             </span>
-
-            {/* Logout — desktop only */}
-            <button onClick={handleLogout} className="hidden md:inline-flex btn-secondary text-sm py-1.5">
-              Logout
+            <button
+              onClick={handleLogout}
+              className="hidden md:inline-flex btn-secondary text-xs py-1.5 px-3"
+            >
+              {t.nav.logout}
             </button>
 
-            {/* Hamburger — mobile only */}
+            {/* Hamburger */}
             <button
-              className="md:hidden p-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+              className="md:hidden p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
               onClick={() => setMenuOpen(o => !o)}
               aria-label="Toggle menu"
             >
               {menuOpen ? (
-                // X icon
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               ) : (
-                // Hamburger icon
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
@@ -90,29 +171,44 @@ export default function Layout() {
           </div>
         </div>
 
-        {/* Mobile dropdown menu */}
+        {/* Mobile dropdown */}
         {menuOpen && (
-          <div className="md:hidden mt-3 space-y-1 border-t border-gray-800 pt-3">
-            {links.map(l => (
+          <div
+            className="md:hidden mt-3 space-y-1 pt-3 max-w-7xl mx-auto"
+            style={{ borderTop: '1px solid rgba(42,57,141,0.3)' }}
+          >
+            {links.map((l, i) => (
               <NavLink
                 key={l.to}
                 to={l.to}
                 end={l.end}
-                className={mobileNavClass}
+                className={({ isActive }) =>
+                  isActive
+                    ? `block px-4 py-3 rounded-lg text-base font-heading font-bold tracking-wide text-white bg-gradient-to-r ${LINK_COLORS[i] ?? 'from-primary-600 to-primary-800'}`
+                    : 'block px-4 py-3 rounded-lg text-base font-heading font-semibold text-gray-300 hover:text-white hover:bg-white/10 transition-colors'
+                }
                 onClick={() => setMenuOpen(false)}
               >
                 {l.label}
               </NavLink>
             ))}
-            <div className="border-t border-gray-800 pt-3 mt-2 flex items-center justify-between px-1">
+            <div
+              className="pt-3 mt-2 flex items-center justify-between px-1"
+              style={{ borderTop: '1px solid rgba(42,57,141,0.3)' }}
+            >
               <span className="text-sm text-gray-400">
                 {user?.username}
                 {user?.role === 'ADMIN' && (
-                  <span className="ml-2 text-xs bg-primary-600 text-white px-2 py-0.5 rounded-full">Admin</span>
+                  <span
+                    className="text-xs text-white px-2 py-0.5 rounded-full font-semibold"
+                    style={{ background: 'linear-gradient(135deg,#E61D25,#2A398D)', marginInlineStart: '0.5rem' }}
+                  >
+                    {t.common.admin}
+                  </span>
                 )}
               </span>
               <button onClick={handleLogout} className="btn-secondary text-sm py-1.5">
-                Logout
+                {t.nav.logout}
               </button>
             </div>
           </div>
@@ -123,6 +219,14 @@ export default function Layout() {
       <main className="flex-1 container mx-auto px-4 py-6 max-w-7xl">
         <Outlet />
       </main>
+
+      {/* Footer */}
+      <footer
+        className="py-3 text-center text-xs tracking-widest font-display"
+        style={{ borderTop: '1px solid rgba(42,57,141,0.2)', color: 'rgba(112,128,200,0.5)' }}
+      >
+        FIFA WORLD CUP 2026 · {t.nav.subtitle.toUpperCase()}
+      </footer>
     </div>
   );
 }
