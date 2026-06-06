@@ -240,7 +240,15 @@ const en = {
   },
 } as const;
 
-const he: typeof en = {
+// Maps every leaf string literal → string, so translated objects
+// only need to match the key shape, not the exact English string values.
+type DeepStringify<T> = T extends string
+  ? string
+  : { [K in keyof T]: DeepStringify<T[K]> };
+
+export type TranslationDict = DeepStringify<typeof en>;
+
+const he: TranslationDict = {
   nav: {
     dashboard:   '🏠 דשבורד',
     matches:     '📅 משחקים',
@@ -466,4 +474,4 @@ const he: typeof en = {
   },
 };
 
-export const translations: Record<Lang, typeof en> = { en, he };
+export const translations: Record<Lang, TranslationDict> = { en, he };

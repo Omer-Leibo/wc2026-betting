@@ -1,10 +1,10 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { translations, type Lang } from './translations';
+import { translations, type Lang, type TranslationDict } from './translations';
 
 interface LanguageContextValue {
   lang:   Lang;
   setLang: (l: Lang) => void;
-  t:      typeof translations['en'];
+  t:      TranslationDict;
   isRTL:  boolean;
 }
 
