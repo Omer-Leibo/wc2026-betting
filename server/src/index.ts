@@ -39,6 +39,8 @@ app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
   // Start the live-data background poller after server is ready
   import('./services/poller').then(({ startPoller }) => startPoller());
+  // Start hourly DB backups
+  import('./services/backupService').then(({ startBackupScheduler }) => startBackupScheduler());
 });
 
 export default app;

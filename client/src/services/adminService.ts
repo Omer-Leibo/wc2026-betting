@@ -30,6 +30,12 @@ export interface AdminStats {
   lastSync?: SyncStatus['lastSync'];
 }
 
+export interface BackupMeta {
+  filename: string;
+  createdAt: string;
+  sizeKb: number;
+}
+
 export const adminService = {
   async getUsers(): Promise<AdminUser[]> {
     const { data } = await api.get<{ users: AdminUser[] }>('/admin/users');
@@ -86,5 +92,19 @@ export const adminService = {
   async syncPlayers(): Promise<number> {
     const { data } = await api.post<{ playersSync: number }>('/admin/sync/players');
     return data.playersSync;
+  },
+
+  async listBackups(): Promise<BackupMeta[]> {
+    const { data } = await api.get<{ backups: BackupMeta[] }>('/admin/backups');
+    return data.backups;
+  },
+
+  async triggerBackup(): Promise<void> {
+    await api.post('/admin/backups');
+  },
+
+  getBackupDownloadUrl(filename: string): string {
+    const base = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001/api`;
+    return `${base}/admin/backups/${encodeURIComponent(filename)}`;
   },
 };

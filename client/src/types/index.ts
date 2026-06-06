@@ -108,6 +108,7 @@ export interface LeaderboardEntry {
   userId: number;
   username: string;
   totalPoints: number;
+  provisionalPoints: number; // extra pts if current live score becomes final (0 when no live games)
   matchPoints: number;
   specialPoints: number;
   bonusPoints: number;

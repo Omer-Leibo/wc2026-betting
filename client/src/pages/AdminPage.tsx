@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
-import { adminService, type AdminUser, type AdminStats, type SyncStatus, type SyncResult } from '../services/adminService';
+import { adminService, type AdminUser, type AdminStats, type SyncStatus, type SyncResult, type BackupMeta } from '../services/adminService';
 import { matchService } from '../services/matchService';
 import type { Match, Team, Player } from '../types';
 
 dayjs.extend(relativeTime);
 
-type Tab = 'overview' | 'results' | 'users' | 'special' | 'sync';
+type Tab = 'overview' | 'results' | 'users' | 'special' | 'sync' | 'backup';
 
 // ─── Searchable player picker (same as SpecialBetsPage) ───────────────────────
 function PlayerPicker({ players, value, onChange, placeholder }: {
@@ -73,6 +73,10 @@ export default function AdminPage() {
   const [syncingPlayers, setSyncingPlayers] = useState(false);
   const [lastSyncResult, setLastSyncResult] = useState<SyncResult | null>(null);
 
+  // Backup state
+  const [backups, setBackups]             = useState<BackupMeta[]>([]);
+  const [backingUp, setBackingUp]         = useState(false);
+
   useEffect(() => {
     Promise.all([
       adminService.getStats(),
@@ -81,10 +85,12 @@ export default function AdminPage() {
       matchService.getTeams(),
       matchService.getPlayers(),
       adminService.getSyncStatus().catch(() => null),
+      adminService.listBackups().catch(() => []),
     ])
-      .then(([s, u, m, t, p, ss]) => {
+      .then(([s, u, m, t, p, ss, bk]) => {
         setStats(s); setUsers(u); setAllMatches(m); setTeams(t); setPlayers(p);
         if (ss) setSyncStatus(ss);
+        setBackups(bk);
       })
       .catch(() => toast.error('Failed to load admin data'))
       .finally(() => setLoading(false));
@@ -156,6 +162,19 @@ export default function AdminPage() {
     } finally { setSavingSpecial(false); }
   };
 
+  // ── Manual backup ────────────────────────────────────────────────────────
+  const handleBackup = async () => {
+    setBackingUp(true);
+    try {
+      await adminService.triggerBackup();
+      const bk = await adminService.listBackups();
+      setBackups(bk);
+      toast.success('Backup created!');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Backup failed');
+    } finally { setBackingUp(false); }
+  };
+
   // ── Delete user ──────────────────────────────────────────────────────────
   const handleDeleteUser = async (id: number, username: string) => {
     if (!confirm(`Delete user "${username}"? This cannot be undone.`)) return;
@@ -196,6 +215,12 @@ export default function AdminPage() {
           🔄 Live Sync
           {syncStatus?.lastSync && (
             <span className="ml-1 text-xs opacity-70">{dayjs(syncStatus.lastSync.syncedAt).fromNow()}</span>
+          )}
+        </button>
+        <button className={tabClass('backup')}   onClick={() => setTab('backup')}>
+          💾 Backups
+          {backups.length > 0 && (
+            <span className="ml-1 text-xs opacity-70">{backups.length}</span>
           )}
         </button>
       </div>
@@ -461,6 +486,66 @@ export default function AdminPage() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── BACKUPS ──────────────────────────────────────────────────────── */}
+      {tab === 'backup' && (
+        <div className="space-y-4 max-w-xl">
+          <div className="card space-y-3">
+            <div>
+              <h2 className="font-semibold">Automatic Backups</h2>
+              <p className="text-gray-400 text-sm mt-1">
+                The server saves a full JSON snapshot of all bets, scores and user data every hour.
+                Files are stored in <span className="text-white font-mono text-xs">server/backups/</span> on disk.
+                The last 7 days (168 files) are kept automatically.
+              </p>
+            </div>
+            <button onClick={handleBackup} disabled={backingUp} className="btn-primary w-full text-sm">
+              {backingUp ? '⏳ Backing up…' : '💾 Backup now'}
+            </button>
+          </div>
+
+          {/* Backup list */}
+          <div className="card space-y-2">
+            <h2 className="font-semibold">Recent Backups</h2>
+            {backups.length === 0 ? (
+              <p className="text-gray-500 text-sm">No backups yet — one will be created on next server start.</p>
+            ) : (
+              <div className="space-y-1">
+                {backups.map((b, i) => (
+                  <div key={b.filename} className="flex items-center justify-between text-sm py-1.5 border-b border-gray-800 last:border-0">
+                    <div className="min-w-0">
+                      <p className={`font-mono text-xs truncate ${i === 0 ? 'text-green-400' : 'text-gray-300'}`}>
+                        {i === 0 && <span className="mr-1">★</span>}{b.filename}
+                      </p>
+                      <p className="text-xs text-gray-500">{dayjs(b.createdAt).format('D MMM YYYY · HH:mm')} · {b.sizeKb} KB</p>
+                    </div>
+                    <a
+                      href={adminService.getBackupDownloadUrl(b.filename)}
+                      download={b.filename}
+                      className="ml-3 shrink-0 text-xs text-primary-400 hover:text-primary-300 border border-primary-700 hover:border-primary-500 px-2 py-1 rounded transition-colors"
+                    >
+                      ⬇ Download
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="card space-y-2 bg-gray-900/50">
+            <h3 className="font-medium text-sm">How to restore a backup</h3>
+            <p className="text-xs text-gray-400">
+              If something goes wrong, stop the server and run from the <span className="font-mono">server/</span> folder:
+            </p>
+            <pre className="text-xs bg-gray-800 rounded p-2 text-green-300 overflow-x-auto whitespace-pre-wrap">
+              node restore-backup.mjs backups/backup_YYYY-MM-...json
+            </pre>
+            <p className="text-xs text-gray-500">
+              This wipes the current database and restores all data from the chosen backup file.
+            </p>
+          </div>
         </div>
       )}
     </div>

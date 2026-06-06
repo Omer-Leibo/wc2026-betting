@@ -15,11 +15,27 @@ function getClient() {
   if (!key || key === 'your_football_data_key_here') {
     throw new Error('FOOTBALL_API_KEY is not set in .env');
   }
-  return axios.create({
+  const client = axios.create({
     baseURL: API_BASE,
     headers: { 'X-Auth-Token': key },
     timeout: 10000,
   });
+
+  // Log the actual API error message (not just the HTTP status code)
+  client.interceptors.response.use(
+    res => res,
+    err => {
+      if (err.response) {
+        const msg = err.response.data?.message ?? JSON.stringify(err.response.data);
+        console.error(`[API] ${err.response.status} from ${err.config?.url ?? '?'}: ${msg}`);
+        // Rethrow with a clearer message
+        throw new Error(`football-data.org ${err.response.status}: ${msg}`);
+      }
+      throw err;
+    },
+  );
+
+  return client;
 }
 
 // ─── football-data.org raw response types ─────────────────────────────────────
@@ -154,7 +170,16 @@ export async function fetchAllFixtures(): Promise<ApiFixture[]> {
   const client = getClient();
   const params: Record<string, string> = {};
   if (COMPETITION !== 'WC') {
-    params.dateFrom = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    // Limit to today onwards so we don't import the entire season history.
+    // Also include the current season year so the API doesn't reject the request
+    // when the competition year is ambiguous (avoids 400 errors).
+    // football-data.org requires dateFrom and dateTo together.
+    // Pull a 14-day window from today so we get upcoming fixtures to bet on.
+    const from = new Date();
+    const to   = new Date(); to.setDate(to.getDate() + 14);
+    params.dateFrom = from.toISOString().slice(0, 10); // YYYY-MM-DD
+    params.dateTo   = to.toISOString().slice(0, 10);
+    params.season   = String(new Date().getFullYear() - 1);  // e.g. 2025 for 2025-26 season
   }
   const resp = await client.get(`/competitions/${COMPETITION}/matches`, { params });
   const matches: FdMatch[] = resp.data.matches ?? [];
@@ -168,9 +193,11 @@ export async function fetchAllFixtures(): Promise<ApiFixture[]> {
 export async function fetchLiveFixtures(): Promise<ApiFixture[]> {
   const client = getClient();
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  const resp = await client.get(`/competitions/${COMPETITION}/matches`, {
-    params: { dateFrom: today, dateTo: today },
-  });
+  const params: Record<string, string> = { dateFrom: today, dateTo: today };
+  if (COMPETITION !== 'WC') {
+    params.season = String(new Date().getFullYear() - 1);
+  }
+  const resp = await client.get(`/competitions/${COMPETITION}/matches`, { params });
   const matches: FdMatch[] = resp.data.matches ?? [];
   const liveOrDone = ['IN_PLAY', 'PAUSED', 'EXTRA_TIME', 'PENALTY_SHOOTOUT', 'FINISHED', 'AWARDED'];
   return matches
@@ -178,10 +205,14 @@ export async function fetchLiveFixtures(): Promise<ApiFixture[]> {
     .map(mapFdMatchToApiFixture);
 }
 
-/** Fetch all teams registered for the WC 2026 */
+/** Fetch all teams registered for the active competition */
 export async function fetchTeams(): Promise<ApiTeam[]> {
   const client = getClient();
-  const resp = await client.get(`/competitions/${COMPETITION}/teams`);
+  const params: Record<string, string> = {};
+  if (COMPETITION !== 'WC') {
+    params.season = String(new Date().getFullYear() - 1);
+  }
+  const resp = await client.get(`/competitions/${COMPETITION}/teams`, { params });
   const teams: FdTeam[] = resp.data.teams ?? [];
   return teams.map(t => ({
     team: { id: t.id, name: t.name, code: t.tla, logo: t.crest },
@@ -205,7 +236,11 @@ export interface ApiTeamWithSquad extends ApiTeam {
 
 export async function fetchAllSquads(): Promise<ApiTeamWithSquad[]> {
   const client = getClient();
-  const resp = await client.get(`/competitions/${COMPETITION}/teams`);
+  const params: Record<string, string> = {};
+  if (COMPETITION !== 'WC') {
+    params.season = String(new Date().getFullYear() - 1);
+  }
+  const resp = await client.get(`/competitions/${COMPETITION}/teams`, { params });
   const raw = resp.data.teams ?? [];
   return raw.map((t: any) => ({
     team: { id: t.id, name: t.name, code: t.tla, logo: t.crest },

@@ -48,3 +48,6 @@ server/prisma/dev.db-journal
 
 # TypeScript
 *.tsbuildinfo
+
+# Backup files (contain user data — keep locally, not in git)
+server/backups/

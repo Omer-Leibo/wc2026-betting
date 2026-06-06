@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
 import { betService } from '../services/betService';
@@ -38,6 +38,18 @@ function getSectionLabel(key: string): string {
   return KNOCKOUT_LABELS[key] ?? key;
 }
 
+/** Approximate in-game minute from kickoff time */
+function getLiveMinute(matchDate: string): string {
+  const kickoff = new Date(matchDate).getTime();
+  const elapsed = Math.floor((Date.now() - kickoff) / 60_000);
+  if (elapsed <= 0)  return 'LIVE';
+  if (elapsed <= 45) return `${elapsed}'`;
+  if (elapsed <= 60) return 'HT';
+  const min2 = elapsed - 15;
+  if (min2 <= 90)    return `${min2}'`;
+  return `90+${min2 - 90}'`;
+}
+
 function Flag({ url, name }: { url?: string; name: string }) {
   if (!url) return null;
   return (
@@ -53,6 +65,16 @@ function MatchBlock({ match, myUserId }: { match: MatchWithAllBets; myUserId?: n
   const isLive     = match.status === 'LIVE';
   const hasScore   = match.homeScore != null && match.awayScore != null;
   const actualWinner = hasScore ? getWinner(match.homeScore!, match.awayScore!) : null;
+
+  // Tick every 30 s while live to keep the minute fresh
+  const [, forceUpdate] = useState(0);
+  useEffect(() => {
+    if (!isLive) return;
+    const timer = setInterval(() => forceUpdate(n => n + 1), 30_000);
+    return () => clearInterval(timer);
+  }, [isLive]);
+
+  const liveMinute = isLive ? getLiveMinute(match.matchDate) : null;
 
   return (
     <div className="card space-y-3">
@@ -72,11 +94,20 @@ function MatchBlock({ match, myUserId }: { match: MatchWithAllBets; myUserId?: n
             </span>
           ) : (
             <span className="text-sm text-gray-400">
-              {isLive ? '🔴 LIVE' : dayjs(match.matchDate).format('D MMM · HH:mm')}
+              {dayjs(match.matchDate).format('D MMM · HH:mm')}
             </span>
           )}
-          <div className="text-[10px] text-gray-600 mt-0.5">
-            {isFinished ? 'FT' : isLive ? '' : 'Locked'}
+          <div className="text-[10px] mt-0.5">
+            {isFinished ? (
+              <span className="text-gray-600">FT</span>
+            ) : isLive ? (
+              <span className="flex items-center justify-center gap-1 text-green-400 font-semibold">
+                <span className="animate-pulse">🔴</span>
+                <span>{liveMinute}</span>
+              </span>
+            ) : (
+              <span className="text-gray-600">Locked</span>
+            )}
           </div>
         </div>
 
@@ -105,6 +136,19 @@ function MatchBlock({ match, myUserId }: { match: MatchWithAllBets; myUserId?: n
                 resultLabel = <span className="text-green-400">✓ Correct{bet.pointsAwarded ? ` +${bet.pointsAwarded}` : ''}</span>;
               } else {
                 resultLabel = <span className="text-red-400">✗ Wrong</span>;
+              }
+            }
+
+            // Provisional result indicator during live games (dimmed to show it's not final)
+            if (isLive && hasScore) {
+              const isExact = bet.predictedHome === match.homeScore && bet.predictedAway === match.awayScore;
+              const correctWin = !isExact && getWinner(bet.predictedHome, bet.predictedAway) === actualWinner;
+              if (isExact) {
+                resultLabel = <span className="text-yellow-300 opacity-60">⭐ Exact?</span>;
+              } else if (correctWin) {
+                resultLabel = <span className="text-green-300 opacity-60">✓ Winning?</span>;
+              } else {
+                resultLabel = <span className="text-red-300 opacity-60">✗ Losing?</span>;
               }
             }
 
@@ -140,12 +184,21 @@ export default function AllBetsPage() {
   const [matches, setMatches] = useState<MatchWithAllBets[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    betService.getAllBets()
-      .then(setMatches)
-      .catch(() => toast.error('Failed to load bets'))
-      .finally(() => setLoading(false));
+  const loadData = useCallback(() => {
+    return betService.getAllBets().then(setMatches).catch(() => toast.error('Failed to load bets'));
   }, []);
+
+  useEffect(() => {
+    loadData().finally(() => setLoading(false));
+  }, [loadData]);
+
+  // Auto-refresh every 60 s while live games are happening
+  useEffect(() => {
+    const hasLive = matches.some(m => m.status === 'LIVE');
+    if (!hasLive) return;
+    const timer = setInterval(loadData, 60_000);
+    return () => clearInterval(timer);
+  }, [matches, loadData]);
 
   if (loading) {
     return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
@@ -165,10 +218,19 @@ export default function AllBetsPage() {
     }
   }
 
+  const hasLive = matches.some(m => m.status === 'LIVE');
+
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
-        <h1 className="text-2xl font-bold">All Bets</h1>
+        <div className="flex items-center gap-3 flex-wrap">
+          <h1 className="text-2xl font-bold">All Bets</h1>
+          {hasLive && (
+            <span className="flex items-center gap-1.5 text-xs bg-green-900/40 border border-green-700 text-green-400 px-2.5 py-1 rounded-full font-medium">
+              <span className="animate-pulse">🔴</span> Live now
+            </span>
+          )}
+        </div>
         <p className="text-gray-400 mt-1 text-sm">
           Everyone's predictions — visible once betting closes for each match (1 minute before kick-off).
         </p>

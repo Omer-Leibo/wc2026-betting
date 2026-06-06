@@ -180,6 +180,31 @@ export async function scoreSpecialBets(
 // ─── Leaderboard ──────────────────────────────────────────────────────────────
 
 export async function getLeaderboard() {
+  // ── Fetch all live matches with current scores and every bet on them ─────
+  // Used to compute provisional (in-progress) points shown during live games.
+  const liveMatches = await prisma.match.findMany({
+    where: { status: 'LIVE', homeScore: { not: null }, awayScore: { not: null } },
+    include: { bets: true },
+  });
+  const hasLiveGames = liveMatches.length > 0;
+
+  // Build map: userId → provisional points from currently live matches
+  const provisionalMap = new Map<number, number>();
+  if (hasLiveGames) {
+    for (const match of liveMatches) {
+      const pts = MATCH_POINTS[match.stage] ?? MATCH_POINTS.GROUP;
+      const actualWinner = getWinner(match.homeScore!, match.awayScore!);
+      for (const bet of match.bets) {
+        const isExact = bet.predictedHome === match.homeScore && bet.predictedAway === match.awayScore;
+        const correctWinner = getWinner(bet.predictedHome, bet.predictedAway) === actualWinner;
+        let p = 0;
+        if (isExact)          p = pts.exact;
+        else if (correctWinner) p = pts.winner;
+        if (p > 0) provisionalMap.set(bet.userId, (provisionalMap.get(bet.userId) ?? 0) + p);
+      }
+    }
+  }
+
   const users = await prisma.user.findMany({
     select: {
       id: true,
@@ -208,12 +233,13 @@ export async function getLeaderboard() {
   type UserWithBets = typeof users[0];
 
   const entries = users.map((user: UserWithBets) => {
-    const matchPoints  = user.matchBets.reduce((s: number, b: { pointsAwarded: number | null }) => s + (b.pointsAwarded ?? 0), 0);
+    const matchPoints   = user.matchBets.reduce((s: number, b: { pointsAwarded: number | null }) => s + (b.pointsAwarded ?? 0), 0);
     const specialPoints = user.specialBets.reduce((s: number, b: { pointsAwarded: number | null }) => s + (b.pointsAwarded ?? 0), 0);
-    const bonusPoints  = user.bonusLogs.reduce((s: number, b: { points: number }) => s + b.points, 0);
+    const bonusPoints   = user.bonusLogs.reduce((s: number, b: { points: number }) => s + b.points, 0);
+    const provisionalPoints = provisionalMap.get(user.id) ?? 0;
 
     let exactScores = 0;
-    let correctScores = 0; // correct winner only (not exact)
+    let correctScores = 0;
 
     for (const bet of user.matchBets) {
       const m = bet.match;
@@ -229,28 +255,41 @@ export async function getLeaderboard() {
     const sbScorer   = user.specialBets.find((b: { type: string }) => b.type === 'TOP_SCORER') as typeof user.specialBets[0] | undefined;
     const sbAssists  = user.specialBets.find((b: { type: string }) => b.type === 'TOP_ASSISTS') as typeof user.specialBets[0] | undefined;
 
+    const totalPoints = matchPoints + specialPoints + bonusPoints;
+
     return {
       userId: user.id,
       username: user.username,
       matchPoints,
       specialPoints,
       bonusPoints,
-      totalPoints: matchPoints + specialPoints + bonusPoints,
+      totalPoints,
+      provisionalPoints, // extra pts if current live score is final — 0 when no live games
       exactScores,
       correctScores,
       specialBetDetails: {
-        champion:  sbChampion ? { name: sbChampion.team?.name ?? '—', pointsAwarded: sbChampion.pointsAwarded } : null,
-        topScorer: sbScorer   ? { name: sbScorer.playerName   ?? '—', pointsAwarded: sbScorer.pointsAwarded   } : null,
-        topAssists: sbAssists ? { name: sbAssists.playerName  ?? '—', pointsAwarded: sbAssists.pointsAwarded  } : null,
+        champion:   sbChampion ? { name: sbChampion.team?.name ?? '—', pointsAwarded: sbChampion.pointsAwarded } : null,
+        topScorer:  sbScorer   ? { name: sbScorer.playerName   ?? '—', pointsAwarded: sbScorer.pointsAwarded   } : null,
+        topAssists: sbAssists  ? { name: sbAssists.playerName  ?? '—', pointsAwarded: sbAssists.pointsAwarded  } : null,
       },
     };
   });
 
   type Entry = typeof entries[0];
-  entries.sort((a: Entry, b: Entry) => b.totalPoints - a.totalPoints);
+
+  // Sort by liveTotal (finalized + provisional) so the table reflects the
+  // current state of play during live games.
+  entries.sort((a: Entry, b: Entry) =>
+    (b.totalPoints + b.provisionalPoints) - (a.totalPoints + a.provisionalPoints)
+  );
+
   let rank = 1;
-  return entries.map((e: Entry, i: number) => {
-    if (i > 0 && entries[i - 1].totalPoints !== e.totalPoints) rank = i + 1;
+  const ranked = entries.map((e: Entry, i: number) => {
+    const liveTotal = e.totalPoints + e.provisionalPoints;
+    const prevLiveTotal = i > 0 ? entries[i - 1].totalPoints + entries[i - 1].provisionalPoints : null;
+    if (i > 0 && prevLiveTotal !== liveTotal) rank = i + 1;
     return { rank, ...e };
   });
+
+  return { entries: ranked, hasLiveGames };
 }

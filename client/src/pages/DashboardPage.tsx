@@ -29,7 +29,7 @@ export default function DashboardPage() {
       .then(([bets, lb]) => {
         setMatchBets(bets.matchBets);
         setSpecialBets(bets.specialBets);
-        setLeaderboard(lb);
+        setLeaderboard(lb.entries);
       })
       .catch(() => toast.error('Failed to load dashboard'))
       .finally(() => setLoading(false));
@@ -60,7 +60,7 @@ export default function DashboardPage() {
         />
         <StatCard label="Match Bets" value={matchBets.length} sub="placed" />
         <StatCard label="Exact Scores" value={myEntry?.exactScores ?? 0} sub="all time" />
-        <StatCard label="Correct Winners" value={myEntry?.correctWinners ?? 0} sub="all time" />
+        <StatCard label="Correct Winners" value={myEntry?.correctScores ?? 0} sub="all time" />
       </div>
 
       {/* Special bets status */}

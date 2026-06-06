@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { leaderboardService } from '../services/leaderboardService';
 import { useAuthStore } from '../store/authStore';
@@ -32,16 +32,29 @@ type Tab = 'rankings' | 'special';
 
 export default function LeaderboardPage() {
   const { user } = useAuthStore();
-  const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>('rankings');
+  const [entries, setEntries]       = useState<LeaderboardEntry[]>([]);
+  const [hasLiveGames, setHasLive]  = useState(false);
+  const [loading, setLoading]       = useState(true);
+  const [tab, setTab]               = useState<Tab>('rankings');
+
+  const loadData = useCallback(async () => {
+    const { entries: e, hasLiveGames: live } = await leaderboardService.get();
+    setEntries(e);
+    setHasLive(live);
+  }, []);
 
   useEffect(() => {
-    leaderboardService.get()
-      .then(setEntries)
+    loadData()
       .catch(() => toast.error('Failed to load leaderboard'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [loadData]);
+
+  // Poll every 60 s while live games are happening
+  useEffect(() => {
+    if (!hasLiveGames) return;
+    const timer = setInterval(() => loadData().catch(() => {}), 60_000);
+    return () => clearInterval(timer);
+  }, [hasLiveGames, loadData]);
 
   if (loading) {
     return <div className="flex justify-center py-20"><div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" /></div>;
@@ -55,9 +68,22 @@ export default function LeaderboardPage() {
   return (
     <div className="max-w-7xl mx-auto space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <h1 className="text-2xl font-bold">Leaderboard</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold">Leaderboard</h1>
+          {hasLiveGames && (
+            <span className="flex items-center gap-1.5 text-xs bg-green-900/40 border border-green-700 text-green-400 px-2.5 py-1 rounded-full font-medium">
+              <span className="animate-pulse">🔴</span> Live
+            </span>
+          )}
+        </div>
         <span className="text-sm text-gray-400">{entries.length} participants</span>
       </div>
+
+      {hasLiveGames && (
+        <p className="text-xs text-green-400/70">
+          ⚡ Scores update every minute — provisional points shown for ongoing matches
+        </p>
+      )}
 
       {/* Tab switcher */}
       <div className="flex gap-2">
@@ -90,6 +116,9 @@ export default function LeaderboardPage() {
             <tbody>
               {entries.map((entry) => {
                 const isMe = entry.userId === user?.id;
+                const liveTotal = entry.totalPoints + entry.provisionalPoints;
+                const hasProvisional = hasLiveGames && entry.provisionalPoints > 0;
+
                 return (
                   <tr
                     key={entry.userId}
@@ -114,7 +143,14 @@ export default function LeaderboardPage() {
                       {entry.bonusPoints > 0 ? `+${entry.bonusPoints}` : '—'}
                     </td>
                     <td className="px-3 py-3 text-center">
-                      <span className="text-lg font-bold text-white">{entry.totalPoints}</span>
+                      {hasProvisional ? (
+                        <span className="flex flex-col items-center leading-tight">
+                          <span className="text-lg font-bold text-white">{liveTotal}</span>
+                          <span className="text-[10px] text-green-400/70">+{entry.provisionalPoints} live</span>
+                        </span>
+                      ) : (
+                        <span className="text-lg font-bold text-white">{entry.totalPoints}</span>
+                      )}
                     </td>
                   </tr>
                 );
@@ -174,6 +210,7 @@ export default function LeaderboardPage() {
         <span><span className="text-green-400">✓</span> Correct result</span>
         <span><span className="text-yellow-400">⭐</span> Exact scoreline</span>
         <span><span className="text-purple-400">🎯</span> Group stage bonus</span>
+        {hasLiveGames && <span><span className="text-green-400/70">+X live</span> Provisional points from ongoing matches</span>}
         <span><span className="text-green-400">✓</span>/<span className="text-red-400">✗</span> on special bets — shown once results announced</span>
       </div>
     </div>

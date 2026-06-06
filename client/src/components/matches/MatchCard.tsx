@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import dayjs from 'dayjs';
 import toast from 'react-hot-toast';
 import { betService } from '../../services/betService';
@@ -34,6 +34,19 @@ function Flag({ url, name }: { url?: string; name: string }) {
 
 function clampScore(val: number) { return Math.max(0, Math.min(30, val)); }
 
+/** Approximate in-game minute calculated from kickoff time.
+ *  Standard assumptions: first half 0–45 min, ~15 min halftime, second half 45–90. */
+function getLiveMinute(matchDate: string): string {
+  const kickoff = new Date(matchDate).getTime();
+  const elapsed = Math.floor((Date.now() - kickoff) / 60_000);
+  if (elapsed <= 0)  return 'LIVE';
+  if (elapsed <= 45) return `${elapsed}'`;
+  if (elapsed <= 60) return 'HT';               // ~15 min halftime window
+  const min2 = elapsed - 15;                    // subtract ~15 min halftime break
+  if (min2 <= 90)    return `${min2}'`;
+  return `90+${min2 - 90}'`;                    // injury time / extra time
+}
+
 export default function MatchCard({ match, bet, onBetSaved }: Props) {
   const isFinished = match.status === 'FINISHED';
   const isLive     = match.status === 'LIVE';
@@ -45,6 +58,14 @@ export default function MatchCard({ match, bet, onBetSaved }: Props) {
   const [away, setAway] = useState<number>(bet?.predictedAway ?? 0);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Re-render every 30 s while live so the minute indicator stays current
+  const [, forceUpdate] = useState(0);
+  useEffect(() => {
+    if (!isLive) return;
+    const timer = setInterval(() => forceUpdate(n => n + 1), 30_000);
+    return () => clearInterval(timer);
+  }, [isLive]);
 
   // Auto-save with 800ms debounce
   const scheduleSave = useCallback((h: number, a: number) => {
@@ -73,14 +94,23 @@ export default function MatchCard({ match, bet, onBetSaved }: Props) {
     (bet.predictedHome > bet.predictedAway ? 'home' : bet.predictedAway > bet.predictedHome ? 'away' : 'draw') ===
     (match.homeScore   > match.awayScore   ? 'home' : match.awayScore   > match.homeScore   ? 'away' : 'draw');
 
+  const liveMinute = isLive ? getLiveMinute(match.matchDate) : null;
+
   return (
     <div className="card">
-      {/* Stage + date row */}
+      {/* Stage + date / live indicator row */}
       <div className="flex justify-between items-center mb-3 text-xs text-gray-500">
         <span>{stageLabel[match.stage]}{match.groupRound ? ` · MD${match.groupRound}` : ''}</span>
-        <span className={isLive ? 'text-green-400 font-semibold animate-pulse' : isFinished ? 'text-gray-500' : 'text-gray-400'}>
-          {isLive ? '🔴 LIVE' : isFinished ? 'FT' : dayjs(match.matchDate).format('D MMM · HH:mm')}
-        </span>
+        {isLive ? (
+          <span className="flex items-center gap-1 text-green-400 font-semibold">
+            <span className="animate-pulse">🔴</span>
+            <span>{liveMinute}</span>
+          </span>
+        ) : isFinished ? (
+          <span className="text-gray-500">FT</span>
+        ) : (
+          <span className="text-gray-400">{dayjs(match.matchDate).format('D MMM · HH:mm')}</span>
+        )}
       </div>
 
       {/* Teams + Score / Bet inputs */}
@@ -101,7 +131,6 @@ export default function MatchCard({ match, bet, onBetSaved }: Props) {
               {match.homeScore} – {match.awayScore}
             </span>
           ) : !bettingOpen ? (
-            // Upcoming but betting is locked (within 1 min of kickoff)
             <span className="text-gray-500 text-xl px-3">🔒</span>
           ) : (
             <>
