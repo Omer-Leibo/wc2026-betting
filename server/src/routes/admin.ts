@@ -3,8 +3,9 @@ import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth';
 import { scoreSpecialBets } from '../services/scoring';
-import { syncAllFixtures, syncLiveFixtures, getLastSync } from '../services/syncService';
+import { syncAllFixtures, syncLiveFixtures, syncPlayers, getLastSync } from '../services/syncService';
 import { fetchQuota } from '../services/footballApi';
+import { runBackup, listBackups, getBackupPath } from '../services/backupService';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -53,14 +54,13 @@ router.patch('/users/:id/role', async (req: AuthRequest, res: Response): Promise
   res.json({ user });
 });
 
-// ─── GET /api/admin/matches/pending ── matches without results ────────────────
+// ─── GET /api/admin/matches/pending ── all matches (for result entry) ─────────
 
 router.get('/matches/pending', async (_req: AuthRequest, res: Response): Promise<void> => {
   const matches = await prisma.match.findMany({
-    where: { status: { not: 'FINISHED' } },
     include: {
-      homeTeam: { select: { id: true, name: true, code: true } },
-      awayTeam: { select: { id: true, name: true, code: true } },
+      homeTeam: { select: { id: true, name: true, code: true, flagUrl: true } },
+      awayTeam: { select: { id: true, name: true, code: true, flagUrl: true } },
     },
     orderBy: { matchDate: 'asc' },
   });
@@ -143,6 +143,44 @@ router.get('/sync/status', async (_req: AuthRequest, res: Response): Promise<voi
     fetchQuota().catch(() => null),
   ]);
   res.json({ lastSync, quota });
+});
+
+// ─── POST /api/admin/sync/players  (sync squad data from API) ─────────────────
+
+router.post('/sync/players', async (_req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const count = await syncPlayers();
+    res.json({ playersSync: count });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ message: msg });
+  }
+});
+
+// ─── GET /api/admin/backups ── list recent backup files ──────────────────────
+
+router.get('/backups', async (_req: AuthRequest, res: Response): Promise<void> => {
+  res.json({ backups: listBackups() });
+});
+
+// ─── POST /api/admin/backups ── trigger a manual backup now ──────────────────
+
+router.post('/backups', async (_req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const filepath = await runBackup();
+    res.json({ message: 'Backup created', filepath });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ message: msg });
+  }
+});
+
+// ─── GET /api/admin/backups/:filename ── download a backup file ───────────────
+
+router.get('/backups/:filename', (req: AuthRequest, res: Response): void => {
+  const filepath = getBackupPath(req.params.filename as string);
+  if (!filepath) { res.status(404).json({ message: 'Backup not found' }); return; }
+  res.download(filepath);
 });
 
 export default router;

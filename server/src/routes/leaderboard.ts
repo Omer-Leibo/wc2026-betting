@@ -6,8 +6,8 @@ const router = Router();
 
 // GET /api/leaderboard
 router.get('/', authenticate, async (_req: AuthRequest, res: Response): Promise<void> => {
-  const leaderboard = await getLeaderboard();
-  res.json({ leaderboard });
+  const { entries, hasLiveGames } = await getLeaderboard();
+  res.json({ leaderboard: entries, hasLiveGames });
 });
 
 export default router;

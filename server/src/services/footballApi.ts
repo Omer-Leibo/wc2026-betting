@@ -6,18 +6,36 @@ import axios from 'axios';
 // Register: https://www.football-data.org/client/register  (instant, no card)
 
 const API_BASE = 'https://api.football-data.org/v4';
-const WC_COMPETITION = 'WC'; // FIFA World Cup (competition ID: 2000)
+// Override with FOOTBALL_API_COMPETITION=SA (or any code) in .env for test mode.
+// Leave unset (or set to WC) for normal World Cup operation.
+const COMPETITION = process.env.FOOTBALL_API_COMPETITION ?? 'WC';
 
 function getClient() {
   const key = process.env.FOOTBALL_API_KEY;
   if (!key || key === 'your_football_data_key_here') {
     throw new Error('FOOTBALL_API_KEY is not set in .env');
   }
-  return axios.create({
+  const client = axios.create({
     baseURL: API_BASE,
     headers: { 'X-Auth-Token': key },
     timeout: 10000,
   });
+
+  // Log the actual API error message (not just the HTTP status code)
+  client.interceptors.response.use(
+    res => res,
+    err => {
+      if (err.response) {
+        const msg = err.response.data?.message ?? JSON.stringify(err.response.data);
+        console.error(`[API] ${err.response.status} from ${err.config?.url ?? '?'}: ${msg}`);
+        // Rethrow with a clearer message
+        throw new Error(`football-data.org ${err.response.status}: ${msg}`);
+      }
+      throw err;
+    },
+  );
+
+  return client;
 }
 
 // ─── football-data.org raw response types ─────────────────────────────────────
@@ -102,6 +120,7 @@ function fdStatusToShort(status: string): string {
 function fdStageToRound(stage: string, matchday: number | null): string {
   switch (stage) {
     case 'GROUP_STAGE':      return `Group Stage - ${matchday ?? 1}`;
+    case 'REGULAR_SEASON':   return `Regular Season - ${matchday ?? 1}`;
     case 'ROUND_OF_32':      return 'Round of 32';
     case 'LAST_16':          return 'Round of 16';
     case 'ROUND_OF_16':      return 'Round of 16';
@@ -109,7 +128,7 @@ function fdStageToRound(stage: string, matchday: number | null): string {
     case 'SEMI_FINALS':      return 'Semi-finals';
     case 'THIRD_PLACE':      return '3rd Place Final';
     case 'FINAL':            return 'Final';
-    default:                 return stage;
+    default:                 return `${stage} - ${matchday ?? 1}`;
   }
 }
 
@@ -143,10 +162,26 @@ function mapFdMatchToApiFixture(m: FdMatch): ApiFixture {
 
 // ─── Public API functions ─────────────────────────────────────────────────────
 
-/** Fetch all WC 2026 fixtures */
+/** Fetch fixtures for the active competition.
+ *  For WC: all matches (104).
+ *  For test competitions (SA, PL, etc.): only from today onwards so we don't
+ *  flood the DB with a full season of historical matches. */
 export async function fetchAllFixtures(): Promise<ApiFixture[]> {
   const client = getClient();
-  const resp = await client.get(`/competitions/${WC_COMPETITION}/matches`);
+  const params: Record<string, string> = {};
+  if (COMPETITION !== 'WC') {
+    // Limit to today onwards so we don't import the entire season history.
+    // Also include the current season year so the API doesn't reject the request
+    // when the competition year is ambiguous (avoids 400 errors).
+    // football-data.org requires dateFrom and dateTo together.
+    // Pull a 14-day window from today so we get upcoming fixtures to bet on.
+    const from = new Date();
+    const to   = new Date(); to.setDate(to.getDate() + 14);
+    params.dateFrom = from.toISOString().slice(0, 10); // YYYY-MM-DD
+    params.dateTo   = to.toISOString().slice(0, 10);
+    params.season   = String(new Date().getFullYear() - 1);  // e.g. 2025 for 2025-26 season
+  }
+  const resp = await client.get(`/competitions/${COMPETITION}/matches`, { params });
   const matches: FdMatch[] = resp.data.matches ?? [];
   return matches.map(mapFdMatchToApiFixture);
 }
@@ -158,9 +193,11 @@ export async function fetchAllFixtures(): Promise<ApiFixture[]> {
 export async function fetchLiveFixtures(): Promise<ApiFixture[]> {
   const client = getClient();
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  const resp = await client.get(`/competitions/${WC_COMPETITION}/matches`, {
-    params: { dateFrom: today, dateTo: today },
-  });
+  const params: Record<string, string> = { dateFrom: today, dateTo: today };
+  if (COMPETITION !== 'WC') {
+    params.season = String(new Date().getFullYear() - 1);
+  }
+  const resp = await client.get(`/competitions/${COMPETITION}/matches`, { params });
   const matches: FdMatch[] = resp.data.matches ?? [];
   const liveOrDone = ['IN_PLAY', 'PAUSED', 'EXTRA_TIME', 'PENALTY_SHOOTOUT', 'FINISHED', 'AWARDED'];
   return matches
@@ -168,14 +205,51 @@ export async function fetchLiveFixtures(): Promise<ApiFixture[]> {
     .map(mapFdMatchToApiFixture);
 }
 
-/** Fetch all teams registered for the WC 2026 */
+/** Fetch all teams registered for the active competition */
 export async function fetchTeams(): Promise<ApiTeam[]> {
   const client = getClient();
-  const resp = await client.get(`/competitions/${WC_COMPETITION}/teams`);
+  const params: Record<string, string> = {};
+  if (COMPETITION !== 'WC') {
+    params.season = String(new Date().getFullYear() - 1);
+  }
+  const resp = await client.get(`/competitions/${COMPETITION}/teams`, { params });
   const teams: FdTeam[] = resp.data.teams ?? [];
   return teams.map(t => ({
     team: { id: t.id, name: t.name, code: t.tla, logo: t.crest },
     venue: { name: '' },
+  }));
+}
+
+/**
+ * Fetch all WC 2026 teams INCLUDING their full squad.
+ * Uses the /competitions/WC/teams endpoint which returns squad arrays.
+ * 1 API call covers all 48 teams.
+ */
+export interface ApiSquadPlayer {
+  id: number;
+  name: string;
+  position: string | null;
+}
+export interface ApiTeamWithSquad extends ApiTeam {
+  squad: ApiSquadPlayer[];
+}
+
+export async function fetchAllSquads(): Promise<ApiTeamWithSquad[]> {
+  const client = getClient();
+  const params: Record<string, string> = {};
+  if (COMPETITION !== 'WC') {
+    params.season = String(new Date().getFullYear() - 1);
+  }
+  const resp = await client.get(`/competitions/${COMPETITION}/teams`, { params });
+  const raw = resp.data.teams ?? [];
+  return raw.map((t: any) => ({
+    team: { id: t.id, name: t.name, code: t.tla, logo: t.crest },
+    venue: { name: '' },
+    squad: (t.squad ?? []).map((p: any) => ({
+      id:       p.id,
+      name:     p.name,
+      position: p.position ?? null,
+    })),
   }));
 }
 
@@ -202,7 +276,7 @@ export function mapStatus(apiStatus: string): 'UPCOMING' | 'LIVE' | 'FINISHED' {
 /** Map round string → our Stage enum + groupRound */
 export function mapStage(round: string): { stage: string; groupRound: number | null } {
   const r = round.toLowerCase();
-  if (r.includes('group stage')) {
+  if (r.includes('group stage') || r.includes('regular season')) {
     const m = round.match(/(\d+)\s*$/);
     return { stage: 'GROUP', groupRound: m ? parseInt(m[1]) : null };
   }

@@ -27,6 +27,7 @@ export interface Team {
 export interface Player {
   id: number;
   name: string;
+  position?: string;
   teamId: number;
   team?: Team;
 }
@@ -39,6 +40,7 @@ export type Stage =
   | 'ROUND_OF_16'
   | 'QUARTER_FINAL'
   | 'SEMI_FINAL'
+  | 'THIRD_PLACE'
   | 'FINAL';
 
 export type MatchStatus = 'UPCOMING' | 'LIVE' | 'FINISHED';
@@ -80,18 +82,43 @@ export interface SpecialBet {
   pointsAwarded?: number;
 }
 
+// ─── All Bets ─────────────────────────────────────────────────────────────────
+
+export interface UserBet {
+  userId: number;
+  username: string;
+  predictedHome: number;
+  predictedAway: number;
+  pointsAwarded: number | null;
+}
+
+export interface MatchWithAllBets extends Match {
+  bets: UserBet[];
+}
+
 // ─── Leaderboard ──────────────────────────────────────────────────────────────
+
+export interface SpecialBetDetail {
+  name: string;
+  pointsAwarded: number | null;
+}
 
 export interface LeaderboardEntry {
   rank: number;
   userId: number;
   username: string;
   totalPoints: number;
+  provisionalPoints: number; // extra pts if current live score becomes final (0 when no live games)
   matchPoints: number;
   specialPoints: number;
   bonusPoints: number;
   exactScores: number;
-  correctWinners: number;
+  correctScores: number;
+  specialBetDetails: {
+    champion:   SpecialBetDetail | null;
+    topScorer:  SpecialBetDetail | null;
+    topAssists: SpecialBetDetail | null;
+  };
 }
 
 // ─── API responses ────────────────────────────────────────────────────────────
