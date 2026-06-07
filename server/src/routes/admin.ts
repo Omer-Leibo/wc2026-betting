@@ -37,6 +37,20 @@ router.delete('/users/:id', async (req: AuthRequest, res: Response): Promise<voi
   res.status(204).send();
 });
 
+// ─── POST /api/admin/users/:id/reset-password ────────────────────────────────
+
+router.post('/users/:id/reset-password', async (req: AuthRequest, res: Response): Promise<void> => {
+  const id = parseInt(req.params.id as string);
+  if (id === req.userId) {
+    res.status(400).json({ message: 'Cannot reset your own password this way' }); return;
+  }
+  // Generate a random 10-char temp password
+  const tempPassword = Math.random().toString(36).slice(2, 7) + Math.random().toString(36).slice(2, 7).toUpperCase();
+  const hashed = await (await import('bcryptjs')).default.hash(tempPassword, 10);
+  await prisma.user.update({ where: { id }, data: { password: hashed } });
+  res.json({ tempPassword });
+});
+
 // ─── PATCH /api/admin/users/:id/role ──────────────────────────────────────────
 
 const roleSchema = z.object({ role: z.enum(['USER', 'ADMIN']) });

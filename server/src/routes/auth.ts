@@ -10,7 +10,7 @@ const prisma = new PrismaClient();
 // ─── Validation schemas ───────────────────────────────────────────────────────
 
 const registerSchema = z.object({
-  username: z.string().min(3).max(20).regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers and underscores'),
+  username: z.string().min(2).max(30).refine(s => s.trim().length >= 2, 'Username must be at least 2 characters'),
   email: z.string().email(),
   password: z.string().min(6),
 });

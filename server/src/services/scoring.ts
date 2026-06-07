@@ -24,7 +24,7 @@ const MATCH_POINTS: Record<string, { winner: number; exact: number }> = {
   FINAL:         { winner: 3, exact: 5 },
 };
 
-const SPECIAL_POINTS = { CHAMPION: 5, TOP_SCORER: 4, TOP_ASSISTS: 3 };
+const SPECIAL_POINTS = { CHAMPION: 10, TOP_SCORER: 12, TOP_ASSISTS: 15 };
 
 // ─── Score one match for all bettors ─────────────────────────────────────────
 
@@ -179,7 +179,13 @@ export async function scoreSpecialBets(
 
 // ─── Leaderboard ──────────────────────────────────────────────────────────────
 
-export async function getLeaderboard() {
+export async function getLeaderboard(requestingUserId?: number) {
+  // ── Check if the tournament has started (first match kicked off) ──────────
+  const firstMatch = await prisma.match.findFirst({ orderBy: { matchDate: 'asc' } });
+  const tournamentStarted = firstMatch
+    ? firstMatch.status !== 'UPCOMING' || new Date(firstMatch.matchDate) <= new Date()
+    : false;
+
   // ── Fetch all live matches with current scores and every bet on them ─────
   // Used to compute provisional (in-progress) points shown during live games.
   const liveMatches = await prisma.match.findMany({
@@ -267,11 +273,12 @@ export async function getLeaderboard() {
       provisionalPoints, // extra pts if current live score is final — 0 when no live games
       exactScores,
       correctScores,
-      specialBetDetails: {
+      // Hide other users' special bets until the tournament has started
+      specialBetDetails: (tournamentStarted || user.id === requestingUserId) ? {
         champion:   sbChampion ? { name: sbChampion.team?.name ?? '—', pointsAwarded: sbChampion.pointsAwarded } : null,
         topScorer:  sbScorer   ? { name: sbScorer.playerName   ?? '—', pointsAwarded: sbScorer.pointsAwarded   } : null,
         topAssists: sbAssists  ? { name: sbAssists.playerName  ?? '—', pointsAwarded: sbAssists.pointsAwarded  } : null,
-      },
+      } : null,
     };
   });
 
@@ -291,5 +298,5 @@ export async function getLeaderboard() {
     return { rank, ...e };
   });
 
-  return { entries: ranked, hasLiveGames };
+  return { entries: ranked, hasLiveGames, tournamentStarted };
 }

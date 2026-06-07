@@ -149,7 +149,9 @@ const en = {
     champion:       '🏆 Champion',
     topScorer:      '⚽ Top Scorer',
     topAssists:     '🎯 Top Assists',
-    livePoints:     'live',
+    livePoints:          'live',
+    specialHiddenTitle:  '🔒 Special bets are hidden',
+    specialHiddenDesc:   "Everyone's champion, top scorer and assists picks will be revealed once the first match kicks off.",
     legend:         {
       correct:        'Correct result',
       exact:          'Exact scoreline',
@@ -386,7 +388,9 @@ const he: TranslationDict = {
     champion:       '🏆 אלוף',
     topScorer:      '⚽ מלך השערים',
     topAssists:     '🎯 מלך הבישולים',
-    livePoints:     'חי',
+    livePoints:          'חי',
+    specialHiddenTitle:  '🔒 הימורים מיוחדים מוסתרים',
+    specialHiddenDesc:   'הבחירות של כולם לאלוף, מלך השערים ומלך הבישולים יתגלו ברגע שהמשחק הראשון יתחיל.',
     legend: {
       correct:        'תוצאה נכונה',
       exact:          'תוצאה מדויקת',
