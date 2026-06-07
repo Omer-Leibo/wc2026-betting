@@ -29,6 +29,21 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
+  // Block registration once the tournament has started (first match kicked off or within 1 min)
+  const firstMatch = await prisma.match.findFirst({
+    orderBy: { matchDate: 'asc' },
+    select: { status: true, matchDate: true },
+  });
+  if (firstMatch) {
+    const tournamentStarted =
+      firstMatch.status !== 'UPCOMING' ||
+      new Date(firstMatch.matchDate).getTime() - Date.now() <= 60_000;
+    if (tournamentStarted) {
+      res.status(403).json({ message: 'Registration is closed — the tournament has already started' });
+      return;
+    }
+  }
+
   const { username, password } = parse.data;
   const email = parse.data.email.toLowerCase();
 
