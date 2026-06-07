@@ -270,11 +270,9 @@ function TeamThenPlayerPicker({
             {/* Close / deselect strip */}
             <div className="flex items-center justify-between text-xs text-gray-500 px-0.5">
               <span>{filtered.length} players</span>
-              {playerName && (
-                <button type="button" className="hover:text-white transition-colors" onClick={() => setOpen(false)}>
-                  ✕ Close
-                </button>
-              )}
+              <button type="button" className="hover:text-white transition-colors" onClick={() => setOpen(false)}>
+                ✕ Close
+              </button>
             </div>
           </div>
 

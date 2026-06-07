@@ -29,7 +29,8 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  const { username, email, password } = parse.data;
+  const { username, password } = parse.data;
+  const email = parse.data.email.toLowerCase();
 
   const existing = await prisma.user.findFirst({
     where: { OR: [{ email }, { username }] },
@@ -59,7 +60,8 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     return;
   }
 
-  const { email, password } = parse.data;
+  const { password } = parse.data;
+  const email = parse.data.email.toLowerCase();
 
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
@@ -79,6 +81,30 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     token,
     user: { id: user.id, username: user.username, email: user.email, role: user.role },
   });
+});
+
+// ─── PATCH /api/auth/change-password ─────────────────────────────────────────
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string(),
+  newPassword: z.string().min(6, 'New password must be at least 6 characters'),
+});
+
+router.patch('/change-password', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const parse = changePasswordSchema.safeParse(req.body);
+  if (!parse.success) {
+    res.status(400).json({ message: parse.error.errors[0].message }); return;
+  }
+  const { currentPassword, newPassword } = parse.data;
+  const user = await prisma.user.findUnique({ where: { id: req.userId } });
+  if (!user) { res.status(404).json({ message: 'User not found' }); return; }
+
+  const valid = await bcrypt.compare(currentPassword, user.password);
+  if (!valid) { res.status(400).json({ message: 'Current password is incorrect' }); return; }
+
+  const hashed = await bcrypt.hash(newPassword, 10);
+  await prisma.user.update({ where: { id: req.userId }, data: { password: hashed } });
+  res.json({ message: 'Password changed successfully' });
 });
 
 // ─── GET /api/auth/me ─────────────────────────────────────────────────────────
