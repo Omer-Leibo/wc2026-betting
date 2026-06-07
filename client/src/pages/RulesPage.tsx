@@ -28,9 +28,9 @@ export default function RulesPage() {
   ];
 
   const specialRows = [
-    { emoji: '🏆', label: t.specialBets.champion.replace('🏆 ', ''),   desc: t.specialBets.championDesc,   pts: 5 },
-    { emoji: '⚽', label: t.specialBets.topScorer.replace('⚽ ', ''),   desc: t.specialBets.topScorerDesc,  pts: 4 },
-    { emoji: '🎯', label: t.specialBets.topAssists.replace('🎯 ', ''),  desc: t.specialBets.topAssistsDesc, pts: 3 },
+    { emoji: '🏆', label: t.specialBets.champion.replace('🏆 ', ''),   desc: t.specialBets.championDesc,   pts: 10 },
+    { emoji: '⚽', label: t.specialBets.topScorer.replace('⚽ ', ''),   desc: t.specialBets.topScorerDesc,  pts: 12 },
+    { emoji: '🎯', label: t.specialBets.topAssists.replace('🎯 ', ''),  desc: t.specialBets.topAssistsDesc, pts: 15 },
   ];
 
   const totalRows = [
