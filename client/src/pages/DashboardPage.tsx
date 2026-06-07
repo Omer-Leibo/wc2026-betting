@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { betService } from '../services/betService';
 import { leaderboardService } from '../services/leaderboardService';
+import { authService } from '../services/authService';
 import { useAuthStore } from '../store/authStore';
 import { useLang } from '../i18n/LanguageContext';
 import type { MatchBet, SpecialBet, LeaderboardEntry } from '../types';
@@ -47,6 +48,28 @@ export default function DashboardPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading]         = useState(true);
 
+  // Change password modal
+  const [showChangePw, setShowChangePw]     = useState(false);
+  const [currentPw, setCurrentPw]           = useState('');
+  const [newPw, setNewPw]                   = useState('');
+  const [confirmPw, setConfirmPw]           = useState('');
+  const [changingPw, setChangingPw]         = useState(false);
+
+  const handleChangePassword = async (e: FormEvent) => {
+    e.preventDefault();
+    if (newPw !== confirmPw) { toast.error('Passwords do not match'); return; }
+    if (newPw.length < 6) { toast.error('New password must be at least 6 characters'); return; }
+    setChangingPw(true);
+    try {
+      await authService.changePassword(currentPw, newPw);
+      toast.success('Password changed successfully!');
+      setShowChangePw(false);
+      setCurrentPw(''); setNewPw(''); setConfirmPw('');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to change password');
+    } finally { setChangingPw(false); }
+  };
+
   useEffect(() => {
     Promise.all([betService.getMyBets(), leaderboardService.get()])
       .then(([bets, lb]) => {
@@ -73,6 +96,38 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6 max-w-4xl mx-auto animate-fade-up">
 
+      {/* ── Change password modal ─────────────────────────────────────────── */}
+      {showChangePw && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
+          <div className="card max-w-sm w-full space-y-4" style={{ border: '1px solid rgba(42,57,141,0.5)' }}>
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-lg">🔒 {t.dashboard.changePassword}</h2>
+              <button type="button" onClick={() => setShowChangePw(false)} className="text-gray-500 hover:text-white text-xl leading-none">✕</button>
+            </div>
+            <form onSubmit={handleChangePassword} className="space-y-3">
+              <div>
+                <label className="label">{t.dashboard.currentPassword}</label>
+                <input type="password" className="input" value={currentPw}
+                  onChange={e => setCurrentPw(e.target.value)} required autoComplete="current-password" />
+              </div>
+              <div>
+                <label className="label">{t.dashboard.newPassword}</label>
+                <input type="password" className="input" value={newPw}
+                  onChange={e => setNewPw(e.target.value)} required minLength={6} autoComplete="new-password" />
+              </div>
+              <div>
+                <label className="label">{t.dashboard.confirmPassword}</label>
+                <input type="password" className="input" value={confirmPw}
+                  onChange={e => setConfirmPw(e.target.value)} required autoComplete="new-password" />
+              </div>
+              <button type="submit" className="btn-primary w-full" disabled={changingPw}>
+                {changingPw ? t.dashboard.saving : t.dashboard.changePasswordBtn}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ── Greeting ─────────────────────────────────────────────────────── */}
       <div>
         <h1
@@ -86,9 +141,17 @@ export default function DashboardPage() {
         >
           {t.dashboard.title}
         </h1>
-        <p className="text-gray-400 mt-1 text-sm">
-          {t.dashboard.welcome} <span className="text-white font-semibold">{user?.username}</span> · {t.dashboard.subtitle}
-        </p>
+        <div className="flex items-center gap-3 mt-1">
+          <p className="text-gray-400 text-sm">
+            {t.dashboard.welcome} <span className="text-white font-semibold">{user?.username}</span> · {t.dashboard.subtitle}
+          </p>
+          <button
+            onClick={() => setShowChangePw(true)}
+            className="text-xs text-gray-500 hover:text-gray-300 transition-colors shrink-0"
+          >
+            🔒 {t.dashboard.changePassword}
+          </button>
+        </div>
       </div>
 
       {/* ── Stat cards ───────────────────────────────────────────────────── */}
