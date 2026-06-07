@@ -5,9 +5,9 @@ import { getLeaderboard } from '../services/scoring';
 const router = Router();
 
 // GET /api/leaderboard
-router.get('/', authenticate, async (_req: AuthRequest, res: Response): Promise<void> => {
-  const { entries, hasLiveGames } = await getLeaderboard();
-  res.json({ leaderboard: entries, hasLiveGames });
+router.get('/', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const { entries, hasLiveGames, tournamentStarted } = await getLeaderboard(req.userId);
+  res.json({ leaderboard: entries, hasLiveGames, tournamentStarted });
 });
 
 export default router;

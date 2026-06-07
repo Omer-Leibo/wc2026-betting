@@ -167,80 +167,82 @@ function TeamPicker({
   );
 }
 
-// ─── Searchable player picker ─────────────────────────────────────────────────
-function PlayerPicker({
-  players, value, onChange, placeholder,
+// ─── Two-step picker: first team, then player from that team ─────────────────
+function TeamThenPlayerPicker({
+  teams, players, playerName, onSelect, locked,
 }: {
+  teams: Team[];
   players: Player[];
-  value: string;
-  onChange: (name: string) => void;
-  placeholder: string;
+  playerName: string;
+  onSelect: (playerName: string) => void;
+  locked?: boolean;
 }) {
-  const [query, setQuery] = useState(value);
-  const [open, setOpen]   = useState(false);
+  const { t } = useLang();
+  const [teamId, setTeamId] = useState<number | ''>(() => {
+    // Pre-select team based on existing playerName
+    if (!playerName) return '';
+    const match = players.find(p => p.name === playerName);
+    return match?.teamId ?? '';
+  });
 
-  const filtered = query.length < 1
-    ? []
-    : players.filter(p => p.name.toLowerCase().includes(query.toLowerCase())).slice(0, 20);
+  const teamPlayers = teamId !== ''
+    ? players.filter(p => p.teamId === teamId)
+    : [];
 
-  const handleSelect = (p: Player) => {
-    onChange(p.name);
-    setQuery(p.name);
-    setOpen(false);
+  const handleTeamChange = (id: number) => {
+    setTeamId(id);
+    onSelect(''); // clear player when team changes
   };
 
   return (
-    <div className="relative flex-1">
-      <input
-        type="text"
-        className="input w-full"
-        placeholder={placeholder}
-        value={query}
-        onChange={e => { setQuery(e.target.value); onChange(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-        autoComplete="off"
+    <div className="flex-1 space-y-2">
+      {/* Step 1 — team */}
+      <TeamPicker
+        teams={teams}
+        value={teamId}
+        onChange={handleTeamChange}
+        locked={locked}
       />
-      {open && filtered.length > 0 && (
+
+      {/* Step 2 — player from that team */}
+      {teamId !== '' && (
         <div
-          className="absolute z-50 left-0 right-0 top-full mt-1 rounded-xl shadow-2xl overflow-hidden"
-          style={{
-            background: 'rgba(10,18,48,0.97)',
-            border: '1px solid rgba(42,57,141,0.45)',
-            backdropFilter: 'blur(12px)',
-            maxHeight: '224px',
-            overflowY: 'auto',
-          }}
+          className="rounded-lg overflow-hidden"
+          style={{ border: '1px solid rgba(60,90,200,0.35)', background: 'rgba(10,20,55,0.85)' }}
         >
-          {filtered.map(p => (
-            <button
-              key={p.id}
-              type="button"
-              className="w-full text-left px-3 py-2.5 text-sm flex items-center justify-between gap-2 transition-colors"
-              style={{ borderBottom: '1px solid rgba(42,57,141,0.15)' }}
-              onMouseEnter={e => ((e.currentTarget as HTMLElement).style.background = 'rgba(42,57,141,0.25)')}
-              onMouseLeave={e => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
-              onMouseDown={() => handleSelect(p)}
-            >
-              <span className="flex items-center gap-2">
-                {p.team?.flagUrl && (
-                  <Flag url={p.team.flagUrl} name={p.team.name} size="sm" />
-                )}
-                <span className="text-white font-medium">{p.name}</span>
-              </span>
-              <span className="text-xs text-gray-500 shrink-0">
-                {p.team?.name} · {p.position ?? '—'}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-      {open && query.length >= 1 && filtered.length === 0 && (
-        <div
-          className="absolute z-50 left-0 right-0 top-full mt-1 rounded-xl p-3 text-sm text-gray-500"
-          style={{ background: 'rgba(10,18,48,0.97)', border: '1px solid rgba(42,57,141,0.3)' }}
-        >
-          No players found. Try a different name.
+          {teamPlayers.length === 0 ? (
+            <p className="text-gray-500 text-sm px-3 py-2.5">{t.specialBets.noPlayersYet}</p>
+          ) : (
+            <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+              {teamPlayers.map(p => {
+                const isSelected = p.name === playerName;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    disabled={locked}
+                    className="w-full text-left px-3 py-2.5 text-sm flex items-center justify-between gap-2 transition-all"
+                    style={{
+                      borderBottom: '1px solid rgba(42,57,141,0.15)',
+                      background: isSelected ? 'rgba(42,57,141,0.35)' : 'transparent',
+                      borderLeft: isSelected ? '3px solid #2A398D' : '3px solid transparent',
+                      cursor: locked ? 'not-allowed' : 'pointer',
+                      opacity: locked ? 0.6 : 1,
+                    }}
+                    onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'rgba(42,57,141,0.18)'; }}
+                    onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                    onClick={() => { if (!locked) onSelect(p.name); }}
+                  >
+                    <span className="text-white font-medium">{p.name}</span>
+                    <span className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs text-gray-500">{p.position ?? '—'}</span>
+                      {isSelected && <span style={{ color: '#3CAC3B', fontSize: '0.8rem' }}>✓</span>}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -252,9 +254,9 @@ export default function SpecialBetsPage() {
   const { t } = useLang();
 
   const BET_TYPES = [
-    { type: 'CHAMPION'    as const, label: t.specialBets.champion,   description: t.specialBets.championDesc,   points: 5 },
-    { type: 'TOP_SCORER'  as const, label: t.specialBets.topScorer,  description: t.specialBets.topScorerDesc,  points: 4 },
-    { type: 'TOP_ASSISTS' as const, label: t.specialBets.topAssists, description: t.specialBets.topAssistsDesc, points: 3 },
+    { type: 'CHAMPION'    as const, label: t.specialBets.champion,   description: t.specialBets.championDesc,   points: 10 },
+    { type: 'TOP_SCORER'  as const, label: t.specialBets.topScorer,  description: t.specialBets.topScorerDesc,  points: 12 },
+    { type: 'TOP_ASSISTS' as const, label: t.specialBets.topAssists, description: t.specialBets.topAssistsDesc, points: 15 },
   ];
 
   const [specialBets, setSpecialBets]   = useState<SpecialBet[]>([]);
@@ -445,16 +447,17 @@ export default function SpecialBetsPage() {
                   locked={tournamentLocked}
                 />
               ) : (
-                <PlayerPicker
+                <TeamThenPlayerPicker
+                  teams={teams}
                   players={players}
-                  value={type === 'TOP_SCORER' ? topScorer : topAssists}
-                  onChange={v => type === 'TOP_SCORER' ? setTopScorer(v) : setTopAssists(v)}
-                  placeholder={noPlayers ? t.specialBets.noPlayersYet : t.specialBets.searchPlayer}
+                  playerName={type === 'TOP_SCORER' ? topScorer : topAssists}
+                  onSelect={v => type === 'TOP_SCORER' ? setTopScorer(v) : setTopAssists(v)}
+                  locked={tournamentLocked}
                 />
               )}
               <button
                 type="submit"
-                className="btn-primary whitespace-nowrap"
+                className="btn-primary whitespace-nowrap self-start"
                 disabled={isSaving || (isPlayer && noPlayers) || tournamentLocked}
               >
                 {isSaving ? t.specialBets.saving : existing ? t.specialBets.update : t.specialBets.save}

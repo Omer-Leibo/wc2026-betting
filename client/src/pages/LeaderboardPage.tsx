@@ -34,15 +34,17 @@ type Tab = 'rankings' | 'special';
 export default function LeaderboardPage() {
   const { user } = useAuthStore();
   const { t } = useLang();
-  const [entries, setEntries]       = useState<LeaderboardEntry[]>([]);
-  const [hasLiveGames, setHasLive]  = useState(false);
-  const [loading, setLoading]       = useState(true);
-  const [tab, setTab]               = useState<Tab>('rankings');
+  const [entries, setEntries]             = useState<LeaderboardEntry[]>([]);
+  const [hasLiveGames, setHasLive]        = useState(false);
+  const [tournamentStarted, setTournamentStarted] = useState(true);
+  const [loading, setLoading]             = useState(true);
+  const [tab, setTab]                     = useState<Tab>('rankings');
 
   const loadData = useCallback(async () => {
-    const { entries: e, hasLiveGames: live } = await leaderboardService.get();
+    const { entries: e, hasLiveGames: live, tournamentStarted: started } = await leaderboardService.get();
     setEntries(e);
     setHasLive(live);
+    setTournamentStarted(started);
   }, []);
 
   useEffect(() => {
@@ -159,6 +161,16 @@ export default function LeaderboardPage() {
               })}
             </tbody>
           </table>
+        </div>
+      ) : !tournamentStarted ? (
+        /* ── Special bets hidden until tournament starts ─────────────────── */
+        <div
+          className="card flex flex-col items-center gap-3 py-10 text-center"
+          style={{ borderLeft: '4px solid #F5A623', background: 'rgba(245,166,35,0.06)' }}
+        >
+          <span className="text-4xl">🔒</span>
+          <p className="text-yellow-400 font-semibold text-lg">{t.leaderboard.specialHiddenTitle}</p>
+          <p className="text-gray-400 text-sm max-w-sm">{t.leaderboard.specialHiddenDesc}</p>
         </div>
       ) : (
         /* ── Special bets table ──────────────────────────────────────────── */
