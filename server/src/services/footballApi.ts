@@ -192,8 +192,10 @@ export async function fetchAllFixtures(): Promise<ApiFixture[]> {
  */
 export async function fetchLiveFixtures(): Promise<ApiFixture[]> {
   const client = getClient();
-  const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  const params: Record<string, string> = { dateFrom: today, dateTo: today };
+  // Include yesterday so a match that kicked off near midnight UTC isn't missed
+  const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+  const today     = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  const params: Record<string, string> = { dateFrom: yesterday, dateTo: today };
   if (COMPETITION !== 'WC') {
     params.season = String(new Date().getFullYear() - 1);
   }

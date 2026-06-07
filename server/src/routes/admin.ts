@@ -1,15 +1,14 @@
 import { Router, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { PrismaClient } from '@prisma/client';
 import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth';
+import { prisma } from '../lib/prisma';
 import { scoreSpecialBets } from '../services/scoring';
 import { syncAllFixtures, syncLiveFixtures, syncPlayers, getLastSync } from '../services/syncService';
 import { fetchQuota } from '../services/footballApi';
 import { runBackup, listBackups, getBackupPath } from '../services/backupService';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // All routes here require admin role
 router.use(authenticate, requireAdmin);

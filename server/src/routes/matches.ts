@@ -1,11 +1,10 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth';
 import { scoreMatch } from '../services/scoring';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 const teamSelect = { id: true, name: true, code: true, group: true, flagUrl: true };
 
@@ -102,7 +101,7 @@ router.patch('/:id/result', authenticate, requireAdmin, async (req: AuthRequest,
 const createMatchSchema = z.object({
   homeTeamId: z.number().int().positive(),
   awayTeamId: z.number().int().positive(),
-  stage: z.enum(['GROUP', 'ROUND_OF_32', 'ROUND_OF_16', 'QUARTER_FINAL', 'SEMI_FINAL', 'FINAL']),
+  stage: z.enum(['GROUP', 'ROUND_OF_32', 'ROUND_OF_16', 'QUARTER_FINAL', 'SEMI_FINAL', 'THIRD_PLACE', 'FINAL']),
   matchDate: z.string().datetime(),
   venue: z.string().optional(),
   groupRound: z.number().int().min(1).max(3).optional(),

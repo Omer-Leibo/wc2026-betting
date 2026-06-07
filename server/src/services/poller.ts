@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import { syncLiveFixtures, syncAllFixtures } from './syncService';
-
-const prisma = new PrismaClient();
 
 const DEFAULT_INTERVAL_MS = 5 * 60 * 1000; // 5 min — no live games
 const LIVE_INTERVAL_MS    = 60 * 1000;      // 1 min — during live games (free tier: 10 req/min)
