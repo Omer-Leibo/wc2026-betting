@@ -46,6 +46,11 @@ export const adminService = {
     await api.delete(`/admin/users/${id}`);
   },
 
+  async resetUserPassword(id: number): Promise<string> {
+    const { data } = await api.post<{ tempPassword: string }>(`/admin/users/${id}/reset-password`);
+    return data.tempPassword;
+  },
+
   async updateUserRole(id: number, role: 'USER' | 'ADMIN'): Promise<void> {
     await api.patch(`/admin/users/${id}/role`, { role });
   },
