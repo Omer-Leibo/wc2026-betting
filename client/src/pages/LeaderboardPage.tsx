@@ -118,8 +118,8 @@ export default function LeaderboardPage() {
             <tbody>
               {entries.map((entry) => {
                 const isMe = entry.userId === user?.id;
-                const liveTotal = entry.totalPoints + entry.provisionalPoints;
-                const hasProvisional = hasLiveGames && entry.provisionalPoints > 0;
+                const liveTotal = entry.totalPoints + entry.provisionalPoints + entry.provisionalBonusPoints;
+                const hasProvisional = (hasLiveGames && entry.provisionalPoints > 0) || entry.provisionalBonusPoints > 0;
 
                 return (
                   <tr
@@ -143,14 +143,26 @@ export default function LeaderboardPage() {
                     </td>
                     <td className="px-3 py-3 text-center text-green-400 font-medium">{entry.correctScores}</td>
                     <td className="px-3 py-3 text-center text-yellow-400 font-medium">{entry.exactScores}</td>
-                    <td className="px-3 py-3 text-center text-purple-400 font-medium">
-                      {entry.bonusPoints > 0 ? `+${entry.bonusPoints}` : '—'}
+                    <td className="px-3 py-3 text-center font-medium">
+                      {(() => {
+                        const totalBonus = entry.bonusPoints + entry.provisionalBonusPoints;
+                        const isProvisional = entry.provisionalBonusPoints > 0;
+                        if (totalBonus === 0) return <span className="text-gray-600">—</span>;
+                        return (
+                          <span className="flex flex-col items-center leading-tight">
+                            <span style={{ color: isProvisional ? '#86efac' : '#c084fc' }}>+{totalBonus}</span>
+                            {isProvisional && (
+                              <span className="text-[10px] text-green-400/50">⚡ live</span>
+                            )}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-3 py-3 text-center">
                       {hasProvisional ? (
                         <span className="flex flex-col items-center leading-tight">
                           <span className="text-lg font-bold text-white">{liveTotal}</span>
-                          <span className="text-[10px] text-green-400/70">+{entry.provisionalPoints} {t.leaderboard.livePoints}</span>
+                          <span className="text-[10px] text-green-400/70">+{entry.provisionalPoints + entry.provisionalBonusPoints} {t.leaderboard.livePoints}</span>
                         </span>
                       ) : (
                         <span className="text-lg font-bold text-white">{entry.totalPoints}</span>

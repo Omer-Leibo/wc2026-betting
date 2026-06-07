@@ -5,44 +5,13 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { adminService, type AdminUser, type AdminStats, type SyncStatus, type SyncResult, type BackupMeta } from '../services/adminService';
 import { matchService } from '../services/matchService';
 import type { Match, Team, Player } from '../types';
+import { Flag } from '../components/Flag';
+import { TeamPicker } from '../components/pickers/TeamPicker';
+import { PlayerPicker } from '../components/pickers/PlayerPicker';
 
 dayjs.extend(relativeTime);
 
 type Tab = 'overview' | 'results' | 'users' | 'special' | 'sync' | 'backup';
-
-// ─── Searchable player picker (same as SpecialBetsPage) ───────────────────────
-function PlayerPicker({ players, value, onChange, placeholder }: {
-  players: Player[]; value: string; onChange: (v: string) => void; placeholder: string;
-}) {
-  const [query, setQuery] = useState(value);
-  const [open, setOpen] = useState(false);
-  const filtered = query.length < 1 ? [] : players.filter(p => p.name.toLowerCase().includes(query.toLowerCase())).slice(0, 20);
-  const pick = (p: Player) => { onChange(p.name); setQuery(p.name); setOpen(false); };
-  return (
-    <div className="relative flex-1">
-      <input type="text" className="input w-full" placeholder={placeholder} value={query}
-        onChange={e => { setQuery(e.target.value); onChange(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 150)} autoComplete="off" />
-      {open && filtered.length > 0 && (
-        <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl max-h-56 overflow-y-auto">
-          {filtered.map(p => (
-            <button key={p.id} type="button" className="w-full text-left px-3 py-2 text-sm hover:bg-gray-700 flex items-center justify-between"
-              onMouseDown={() => pick(p)}>
-              <span className="text-white">{p.name}</span>
-              <span className="text-xs text-gray-500 ml-2">{p.team?.name} · {p.position ?? '—'}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Flag component ───────────────────────────────────────────────────────────
-function Flag({ url, name }: { url?: string; name: string }) {
-  if (!url) return null;
-  return <img src={url} alt={name} className="w-5 h-3.5 object-contain inline-block" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />;
-}
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminPage() {
@@ -314,7 +283,7 @@ export default function AdminPage() {
                     {/* Teams */}
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <Flag url={match.homeTeam.flagUrl} name={match.homeTeam.name} />
+                        <Flag url={match.homeTeam.flagUrl} name={match.homeTeam.name} size="sm" />
                         <span className="font-semibold text-white text-sm">{match.homeTeam.name}</span>
                       </div>
                       {match.status === 'FINISHED' ? (
@@ -324,7 +293,7 @@ export default function AdminPage() {
                       )}
                       <div className="flex items-center gap-1.5">
                         <span className="font-semibold text-white text-sm">{match.awayTeam.name}</span>
-                        <Flag url={match.awayTeam.flagUrl} name={match.awayTeam.name} />
+                        <Flag url={match.awayTeam.flagUrl} name={match.awayTeam.name} size="sm" />
                       </div>
                     </div>
 
@@ -393,26 +362,21 @@ export default function AdminPage() {
           {specialType === 'CHAMPION' ? (
             <div>
               <label className="label">Winner team</label>
-              <select className="input" value={specialTeamId} onChange={e => setSpecialTeamId(Number(e.target.value))}>
-                <option value="">Select team…</option>
-                {['A','B','C','D','E','F','G','H','I','J','K','L'].map(g => (
-                  <optgroup key={g} label={`Group ${g}`}>
-                    {teams.filter(t => t.group === g).map(t => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
+              <TeamPicker
+                teams={teams}
+                value={specialTeamId}
+                onChange={id => setSpecialTeamId(id)}
+              />
             </div>
           ) : (
             <div>
               <label className="label">Player name</label>
               {players.length > 0 ? (
                 <PlayerPicker
+                  teams={teams}
                   players={players}
-                  value={specialPlayer}
-                  onChange={setSpecialPlayer}
-                  placeholder="Search player name…"
+                  playerName={specialPlayer}
+                  onSelect={setSpecialPlayer}
                 />
               ) : (
                 <input type="text" className="input" placeholder="Type player name…"
