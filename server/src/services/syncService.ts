@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import {
   fetchAllFixtures,
   fetchLiveFixtures,
@@ -10,8 +10,6 @@ import {
   type ApiFixture,
 } from './footballApi';
 import { scoreMatch } from './scoring';
-
-const prisma = new PrismaClient();
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -144,14 +142,17 @@ async function processOneFixture(fixture: ApiFixture, result: SyncResult): Promi
   const awayScore = fixture.score.fulltime.away ?? fixture.goals.away;
 
   // ── Find existing match by externalId, or by team pair ───────────────────
-  const existingMatch = await prisma.match.findFirst({
-    where: {
-      OR: [
-        { externalId: fixture.fixture.id },
-        { homeTeamId: homeTeam.id, awayTeamId: awayTeam.id },
-      ],
-    },
+  // First try by external ID — this is reliable and prevents a cross-stage collision
+  // where two teams meet in the group stage AND again in the knockouts.
+  let existingMatch = await prisma.match.findFirst({
+    where: { externalId: fixture.fixture.id },
   });
+  // Only fall back to team-pair for records that haven't been linked to an externalId yet.
+  if (!existingMatch) {
+    existingMatch = await prisma.match.findFirst({
+      where: { homeTeamId: homeTeam.id, awayTeamId: awayTeam.id, externalId: null },
+    });
+  }
 
   if (existingMatch) {
     const wasFinished = existingMatch.status === 'FINISHED';

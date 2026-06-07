@@ -1,8 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../lib/prisma';
 import * as fs from 'fs';
 import * as path from 'path';
-
-const prisma = new PrismaClient();
 
 // Backups land in  server/backups/  (next to src/)
 const BACKUP_DIR = path.join(process.cwd(), 'backups');

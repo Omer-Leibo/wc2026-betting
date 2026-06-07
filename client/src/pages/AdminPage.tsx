@@ -547,6 +547,22 @@ export default function AdminPage() {
       {/* ── BACKUPS ──────────────────────────────────────────────────────── */}
       {tab === 'backup' && (
         <div className="space-y-4 max-w-xl">
+          {/* Railway filesystem warning */}
+          <div
+            className="card flex gap-3 text-sm"
+            style={{ borderLeft: '4px solid #F5A623', background: 'rgba(245,166,35,0.08)' }}
+          >
+            <span className="text-xl shrink-0">⚠️</span>
+            <div>
+              <p className="font-semibold text-yellow-400">Backups are lost on every deploy</p>
+              <p className="text-yellow-400/70 text-xs mt-1">
+                Railway's container filesystem is wiped on each redeploy. Always{' '}
+                <strong className="text-yellow-300">download the latest backup below before pushing new code</strong>.
+                The database itself is safe — only these snapshot files are ephemeral.
+              </p>
+            </div>
+          </div>
+
           <div className="card space-y-3">
             <div>
               <h2 className="font-semibold">Automatic Backups</h2>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { matchService } from '../services/matchService';
 import { betService } from '../services/betService';
@@ -26,12 +26,25 @@ export default function MatchesPage() {
   const [view, setView]               = useState<View>('ALL');
   const [selectedGroup, setSelectedGroup] = useState<string>('A');
 
+  const loadData = useCallback(async () => {
+    const [m, b] = await Promise.all([matchService.getAll(), betService.getMyBets()]);
+    setMatches(m);
+    setBets(b.matchBets);
+  }, []);
+
   useEffect(() => {
-    Promise.all([matchService.getAll(), betService.getMyBets()])
-      .then(([m, b]) => { setMatches(m); setBets(b.matchBets); })
+    loadData()
       .catch(() => toast.error('Failed to load data'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [loadData]);
+
+  // Poll every 60 s while any match is live so scores stay current
+  const hasLiveMatches = matches.some(m => m.status === 'LIVE');
+  useEffect(() => {
+    if (!hasLiveMatches) return;
+    const timer = setInterval(() => loadData().catch(() => {}), 60_000);
+    return () => clearInterval(timer);
+  }, [hasLiveMatches, loadData]);
 
   // Translated knockout labels (reactive to language)
   const KNOCKOUT_LABELS: Record<string, string> = {
