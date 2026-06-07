@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth';
@@ -46,7 +47,7 @@ router.post('/users/:id/reset-password', async (req: AuthRequest, res: Response)
   }
   // Generate a random 10-char temp password
   const tempPassword = Math.random().toString(36).slice(2, 7) + Math.random().toString(36).slice(2, 7).toUpperCase();
-  const hashed = await (await import('bcryptjs')).default.hash(tempPassword, 10);
+  const hashed = await bcrypt.hash(tempPassword, 10);
   await prisma.user.update({ where: { id }, data: { password: hashed } });
   res.json({ tempPassword });
 });

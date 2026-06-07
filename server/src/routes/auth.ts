@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
+import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -108,8 +109,6 @@ router.patch('/change-password', authenticate, async (req: AuthRequest, res: Res
 });
 
 // ─── GET /api/auth/me ─────────────────────────────────────────────────────────
-
-import { authenticate, AuthRequest } from '../middleware/auth';
 
 router.get('/me', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
   const user = await prisma.user.findUnique({
