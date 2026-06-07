@@ -141,16 +141,23 @@ export default function DashboardPage() {
         >
           {t.dashboard.title}
         </h1>
-        <div className="flex items-center gap-3 mt-1">
-          <p className="text-gray-400 text-sm">
-            {t.dashboard.welcome} <span className="text-white font-semibold">{user?.username}</span> · {t.dashboard.subtitle}
-          </p>
+        <div className="flex items-center gap-2.5 mt-2 flex-wrap">
+          <p className="text-gray-400 text-sm">{t.dashboard.welcome}</p>
+          <span className="text-white font-semibold text-sm">{user?.username}</span>
           <button
             onClick={() => setShowChangePw(true)}
-            className="text-xs text-gray-500 hover:text-gray-300 transition-colors shrink-0"
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md font-medium transition-all shrink-0"
+            style={{
+              background: 'rgba(42,57,141,0.22)',
+              border: '1px solid rgba(42,57,141,0.55)',
+              color: '#9ca3af',
+            }}
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#e2e8f0'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(42,57,141,0.9)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#9ca3af'; (e.currentTarget as HTMLElement).style.borderColor = 'rgba(42,57,141,0.55)'; }}
           >
             🔒 {t.dashboard.changePassword}
           </button>
+          <span className="text-gray-600 text-sm hidden sm:inline">· {t.dashboard.subtitle}</span>
         </div>
       </div>
 
