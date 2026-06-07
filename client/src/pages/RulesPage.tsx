@@ -1,5 +1,8 @@
 import { useLang } from '../i18n/LanguageContext';
 
+// Special bet points must match SPECIAL_POINTS in server/src/services/scoring.ts
+const SPECIAL_BET_POINTS = { CHAMPION: 10, TOP_SCORER: 12, TOP_ASSISTS: 15 } as const;
+
 export default function RulesPage() {
   const { t } = useLang();
 
@@ -28,9 +31,9 @@ export default function RulesPage() {
   ];
 
   const specialRows = [
-    { emoji: '🏆', label: t.specialBets.champion.replace('🏆 ', ''),   desc: t.specialBets.championDesc,   pts: 5 },
-    { emoji: '⚽', label: t.specialBets.topScorer.replace('⚽ ', ''),   desc: t.specialBets.topScorerDesc,  pts: 4 },
-    { emoji: '🎯', label: t.specialBets.topAssists.replace('🎯 ', ''),  desc: t.specialBets.topAssistsDesc, pts: 3 },
+    { emoji: '🏆', label: t.specialBets.champion.replace('🏆 ', ''),   desc: t.specialBets.championDesc,   pts: SPECIAL_BET_POINTS.CHAMPION   },
+    { emoji: '⚽', label: t.specialBets.topScorer.replace('⚽ ', ''),   desc: t.specialBets.topScorerDesc,  pts: SPECIAL_BET_POINTS.TOP_SCORER  },
+    { emoji: '🎯', label: t.specialBets.topAssists.replace('🎯 ', ''),  desc: t.specialBets.topAssistsDesc, pts: SPECIAL_BET_POINTS.TOP_ASSISTS },
   ];
 
   const totalRows = [
