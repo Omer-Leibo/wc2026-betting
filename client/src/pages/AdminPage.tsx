@@ -187,6 +187,23 @@ export default function AdminPage() {
     }
   };
 
+  // ── Reset password ────────────────────────────────────────────────────────
+  const [resetModal, setResetModal] = useState<{ username: string; tempPassword: string } | null>(null);
+  const [resettingId, setResettingId] = useState<number | null>(null);
+
+  const handleResetPassword = async (id: number, username: string) => {
+    if (!confirm(`Reset password for "${username}"? A temporary password will be generated.`)) return;
+    setResettingId(id);
+    try {
+      const tempPassword = await adminService.resetUserPassword(id);
+      setResetModal({ username, tempPassword });
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to reset password');
+    } finally {
+      setResettingId(null);
+    }
+  };
+
   const tabClass = (t: Tab) =>
     `px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t ? 'bg-primary-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'}`;
 
@@ -200,6 +217,34 @@ export default function AdminPage() {
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
+
+      {/* ── Reset password modal ──────────────────────────────────────────── */}
+      {resetModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)' }}>
+          <div className="card max-w-sm w-full space-y-4" style={{ border: '1px solid rgba(245,166,35,0.4)' }}>
+            <h2 className="font-semibold text-lg">🔑 Temporary Password</h2>
+            <p className="text-gray-400 text-sm">
+              Password for <span className="text-white font-semibold">{resetModal.username}</span> has been reset.
+              Share this with them — they should change it after logging in.
+            </p>
+            <div className="flex items-center gap-2">
+              <code
+                className="flex-1 text-center text-xl font-mono font-bold tracking-widest rounded-lg px-4 py-3 select-all"
+                style={{ background: 'rgba(245,166,35,0.12)', color: '#F5A623', border: '1px solid rgba(245,166,35,0.3)' }}
+              >
+                {resetModal.tempPassword}
+              </code>
+              <button
+                className="btn-secondary text-sm px-3 py-3"
+                onClick={() => { navigator.clipboard.writeText(resetModal.tempPassword); toast.success('Copied!'); }}
+              >
+                📋
+              </button>
+            </div>
+            <button className="btn-primary w-full" onClick={() => setResetModal(null)}>Done</button>
+          </div>
+        </div>
+      )}
       <div className="flex items-center gap-3">
         <h1 className="text-2xl font-bold">Admin Panel</h1>
         <span className="text-xs bg-yellow-600 text-white px-2 py-0.5 rounded-full">Admin only</span>
@@ -400,9 +445,19 @@ export default function AdminPage() {
                   {u._count.matchBets} match bets · {u._count.specialBets} special bets · joined {dayjs(u.createdAt).format('D MMM YYYY')}
                 </p>
               </div>
-              <button onClick={() => handleDeleteUser(u.id, u.username)} className="btn-danger text-xs py-1.5 px-3 shrink-0">
-                Delete
-              </button>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  onClick={() => handleResetPassword(u.id, u.username)}
+                  disabled={resettingId === u.id}
+                  className="btn-secondary text-xs py-1.5 px-3"
+                  title="Reset password"
+                >
+                  {resettingId === u.id ? '…' : '🔑 Reset PW'}
+                </button>
+                <button onClick={() => handleDeleteUser(u.id, u.username)} className="btn-danger text-xs py-1.5 px-3">
+                  Delete
+                </button>
+              </div>
             </div>
           ))}
         </div>

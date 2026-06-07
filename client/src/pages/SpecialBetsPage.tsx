@@ -167,7 +167,7 @@ function TeamPicker({
   );
 }
 
-// ─── Two-step picker: first team, then player from that team ─────────────────
+// ─── Combined search + team filter + player list picker ──────────────────────
 function TeamThenPlayerPicker({
   teams, players, playerName, onSelect, locked,
 }: {
@@ -178,71 +178,145 @@ function TeamThenPlayerPicker({
   locked?: boolean;
 }) {
   const { t } = useLang();
+  const [open, setOpen]     = useState(!playerName);
+  const [search, setSearch] = useState('');
   const [teamId, setTeamId] = useState<number | ''>(() => {
-    // Pre-select team based on existing playerName
     if (!playerName) return '';
-    const match = players.find(p => p.name === playerName);
-    return match?.teamId ?? '';
+    return players.find(p => p.name === playerName)?.teamId ?? '';
   });
 
-  const teamPlayers = teamId !== ''
-    ? players.filter(p => p.teamId === teamId)
-    : [];
+  const selectedPlayer = players.find(p => p.name === playerName);
+  const selectedTeam   = teams.find(t => t.id === selectedPlayer?.teamId);
+
+  // Combined filter: search text AND/OR team
+  const filtered = players.filter(p => {
+    const matchesSearch = !search.trim() || p.name.toLowerCase().includes(search.toLowerCase());
+    const matchesTeam   = teamId === '' || p.teamId === teamId;
+    return matchesSearch && matchesTeam;
+  }).slice(0, 60);
+
+  const handleSelect = (p: Player) => {
+    onSelect(p.name);
+    setOpen(false);
+  };
+
+  const handleClear = () => {
+    onSelect('');
+    setSearch('');
+    setTeamId('');
+    setOpen(true);
+  };
 
   const handleTeamChange = (id: number) => {
     setTeamId(id);
-    onSelect(''); // clear player when team changes
+    // Don't clear player — just filter the list
   };
 
   return (
     <div className="flex-1 space-y-2">
-      {/* Step 1 — team */}
-      <TeamPicker
-        teams={teams}
-        value={teamId}
-        onChange={handleTeamChange}
-        locked={locked}
-      />
-
-      {/* Step 2 — player from that team */}
-      {teamId !== '' && (
+      {/* ── Current selection (collapsed state) ── */}
+      {playerName && !open && (
         <div
-          className="rounded-lg overflow-hidden"
-          style={{ border: '1px solid rgba(60,90,200,0.35)', background: 'rgba(10,20,55,0.85)' }}
+          className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg"
+          style={{ background: 'rgba(10,20,55,0.85)', border: '1px solid rgba(60,172,59,0.4)' }}
         >
-          {teamPlayers.length === 0 ? (
-            <p className="text-gray-500 text-sm px-3 py-2.5">{t.specialBets.noPlayersYet}</p>
-          ) : (
-            <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
-              {teamPlayers.map(p => {
+          {selectedTeam?.flagUrl && (
+            <Flag url={selectedTeam.flagUrl} name={selectedTeam.name} size="md" />
+          )}
+          <span className="text-white font-semibold text-sm flex-1">{playerName}</span>
+          {selectedPlayer?.position && (
+            <span className="text-xs text-gray-500">{selectedPlayer.position}</span>
+          )}
+          {!locked && (
+            <button
+              type="button"
+              onClick={handleClear}
+              className="text-gray-400 hover:text-white text-xs ml-1 transition-colors"
+              title="Change player"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ── Open picker ── */}
+      {open && !locked && (
+        <div
+          className="rounded-xl overflow-hidden"
+          style={{ border: '1px solid rgba(60,90,200,0.35)', background: 'rgba(10,18,48,0.97)' }}
+        >
+          {/* Search bar */}
+          <div className="p-2 space-y-2 border-b" style={{ borderColor: 'rgba(42,57,141,0.3)' }}>
+            <div className="relative">
+              <input
+                type="text"
+                className="input w-full text-sm py-2 pr-8"
+                placeholder={`🔍 ${t.specialBets.searchPlayer}`}
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                autoFocus
+              />
+              {search && (
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white text-xs"
+                  onClick={() => setSearch('')}
+                >✕</button>
+              )}
+            </div>
+            {/* Team filter */}
+            <TeamPicker teams={teams} value={teamId} onChange={handleTeamChange} />
+            {/* Close / deselect strip */}
+            <div className="flex items-center justify-between text-xs text-gray-500 px-0.5">
+              <span>{filtered.length} players</span>
+              {playerName && (
+                <button type="button" className="hover:text-white transition-colors" onClick={() => setOpen(false)}>
+                  ✕ Close
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Player list */}
+          <div style={{ maxHeight: '220px', overflowY: 'auto' }}>
+            {filtered.length === 0 ? (
+              <p className="text-gray-500 text-sm text-center py-5">{t.specialBets.noPlayersYet}</p>
+            ) : (
+              filtered.map(p => {
                 const isSelected = p.name === playerName;
+                const pTeam = teams.find(t => t.id === p.teamId);
                 return (
                   <button
                     key={p.id}
                     type="button"
-                    disabled={locked}
-                    className="w-full text-left px-3 py-2.5 text-sm flex items-center justify-between gap-2 transition-all"
+                    className="w-full text-left px-3 py-2.5 text-sm flex items-center gap-2.5 transition-all"
                     style={{
-                      borderBottom: '1px solid rgba(42,57,141,0.15)',
+                      borderBottom: '1px solid rgba(42,57,141,0.12)',
                       background: isSelected ? 'rgba(42,57,141,0.35)' : 'transparent',
                       borderLeft: isSelected ? '3px solid #2A398D' : '3px solid transparent',
-                      cursor: locked ? 'not-allowed' : 'pointer',
-                      opacity: locked ? 0.6 : 1,
                     }}
                     onMouseEnter={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'rgba(42,57,141,0.18)'; }}
-                    onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                    onClick={() => { if (!locked) onSelect(p.name); }}
+                    onMouseLeave={e => { if (!isSelected) (e.currentTarget as HTMLElement).style.background = isSelected ? 'rgba(42,57,141,0.35)' : 'transparent'; }}
+                    onClick={() => handleSelect(p)}
                   >
-                    <span className="text-white font-medium">{p.name}</span>
-                    <span className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs text-gray-500">{p.position ?? '—'}</span>
-                      {isSelected && <span style={{ color: '#3CAC3B', fontSize: '0.8rem' }}>✓</span>}
-                    </span>
+                    {pTeam?.flagUrl && <Flag url={pTeam.flagUrl} name={pTeam.name} size="sm" />}
+                    <span className="text-white font-medium flex-1">{p.name}</span>
+                    <span className="text-xs text-gray-500 shrink-0">{p.position ?? '—'}</span>
+                    {isSelected && <span style={{ color: '#3CAC3B', fontSize: '0.8rem' }}>✓</span>}
                   </button>
                 );
-              })}
-            </div>
-          )}
+              })
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Locked state with no selection */}
+      {locked && !playerName && (
+        <div className="px-3 py-2.5 rounded-lg text-gray-500 text-sm"
+          style={{ background: 'rgba(10,20,55,0.85)', border: '1px solid rgba(60,90,200,0.2)', opacity: 0.6 }}>
+          {t.specialBets.noPlayersYet}
         </div>
       )}
     </div>
