@@ -556,13 +556,12 @@ export default function AdminPage() {
                       </p>
                       <p className="text-xs text-gray-500">{dayjs(b.createdAt).format('D MMM YYYY · HH:mm')} · {b.sizeKb} KB</p>
                     </div>
-                    <a
-                      href={adminService.getBackupDownloadUrl(b.filename)}
-                      download={b.filename}
+                    <button
+                      onClick={() => adminService.downloadBackup(b.filename)}
                       className="ml-3 shrink-0 text-xs text-primary-400 hover:text-primary-300 border border-primary-700 hover:border-primary-500 px-2 py-1 rounded transition-colors"
                     >
                       ⬇ Download
-                    </a>
+                    </button>
                   </div>
                 ))}
               </div>

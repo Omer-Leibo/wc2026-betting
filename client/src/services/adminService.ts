@@ -108,8 +108,17 @@ export const adminService = {
     await api.post('/admin/backups');
   },
 
-  getBackupDownloadUrl(filename: string): string {
-    const base = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:3001/api`;
-    return `${base}/admin/backups/${encodeURIComponent(filename)}`;
+  async downloadBackup(filename: string): Promise<void> {
+    const { data } = await api.get<Blob>(`/admin/backups/${encodeURIComponent(filename)}`, {
+      responseType: 'blob',
+    });
+    const url = URL.createObjectURL(data);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   },
 };
