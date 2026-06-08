@@ -2,12 +2,26 @@ import { useEffect, useState, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { betService } from '../services/betService';
+import { matchService } from '../services/matchService';
 import { leaderboardService } from '../services/leaderboardService';
 import { authService } from '../services/authService';
 import { useAuthStore } from '../store/authStore';
+import { useBetAlertStore } from '../store/betAlertStore';
 import { useLang } from '../i18n/LanguageContext';
 import type { MatchBet, SpecialBet, LeaderboardEntry } from '../types';
 import dayjs from 'dayjs';
+
+// ── Countdown helper ─────────────────────────────────────────────────────────
+function formatTimeUntil(dateStr: string): { text: string; urgent: boolean } {
+  const ms = new Date(dateStr).getTime() - Date.now();
+  if (ms <= 0) return { text: '', urgent: true };
+  const totalMins = Math.floor(ms / 60_000);
+  const days  = Math.floor(totalMins / 1440);
+  const hours = Math.floor((totalMins % 1440) / 60);
+  const mins  = totalMins % 60;
+  const text  = days >= 1 ? `${days}d ${hours}h` : hours >= 1 ? `${hours}h ${mins}m` : `${mins}m`;
+  return { text, urgent: ms < 60 * 60 * 1000 };
+}
 
 // ── Colorful stat card ──────────────────────────────────────────────────────
 function StatCard({
@@ -48,6 +62,16 @@ export default function DashboardPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading]         = useState(true);
 
+  // Countdown tick — re-renders countdown text every 30 s
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick(n => n + 1), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const { unbettedCount, nextUnbettedMatch } = useBetAlertStore();
+  const updateBetAlert = useBetAlertStore(s => s.update);
+
   // Change password modal
   const [showChangePw, setShowChangePw]     = useState(false);
   const [currentPw, setCurrentPw]           = useState('');
@@ -71,15 +95,16 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    Promise.all([betService.getMyBets(), leaderboardService.get()])
-      .then(([bets, lb]) => {
+    Promise.all([betService.getMyBets(), leaderboardService.get(), matchService.getAll()])
+      .then(([bets, lb, matches]) => {
         setMatchBets(bets.matchBets);
         setSpecialBets(bets.specialBets);
         setLeaderboard(lb.entries);
+        updateBetAlert(matches, bets.matchBets);
       })
       .catch(() => toast.error('Failed to load dashboard'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [updateBetAlert]);
 
   const myEntry     = leaderboard.find(e => e.userId === user?.id);
   const finishedBets = matchBets.filter(b => b.match?.status === 'FINISHED');
@@ -175,6 +200,51 @@ export default function DashboardPage() {
         <StatCard label={t.dashboard.exactScores} value={myEntry?.exactScores ?? 0} sub={t.dashboard.allTime} variant="green" />
         <StatCard label={t.dashboard.correctResults} value={myEntry?.correctScores ?? 0} sub={t.dashboard.allTime} variant="red" />
       </div>
+
+      {/* ── Unbet warning card ───────────────────────────────────────────── */}
+      {unbettedCount > 0 && (() => {
+        const countdown = nextUnbettedMatch ? formatTimeUntil(nextUnbettedMatch.matchDate) : null;
+        const urgent = countdown?.urgent ?? false;
+        return (
+          <Link
+            to="/matches"
+            className="block rounded-xl px-4 py-3 transition-opacity hover:opacity-90"
+            style={{
+              background: urgent
+                ? 'linear-gradient(135deg, rgba(220,38,38,0.18) 0%, rgba(185,28,28,0.10) 100%)'
+                : 'linear-gradient(135deg, rgba(245,158,11,0.18) 0%, rgba(217,119,6,0.10) 100%)',
+              border: `1px solid ${urgent ? 'rgba(220,38,38,0.45)' : 'rgba(245,158,11,0.45)'}`,
+            }}
+          >
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2.5">
+                <span className={`text-xl ${urgent ? 'animate-pulse' : ''}`}>
+                  {urgent ? '🚨' : '⚠️'}
+                </span>
+                <div>
+                  <p className={`text-sm font-semibold ${urgent ? 'text-red-300' : 'text-amber-300'}`}>
+                    {unbettedCount === 1 ? `1 ${t.dashboard.unbettedOne}` : `${unbettedCount} ${t.dashboard.unbettedMany}`}
+                  </p>
+                  {nextUnbettedMatch && countdown && countdown.text && (
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {t.dashboard.nextKicksOff}:{' '}
+                      <span className={`font-bold ${urgent ? 'text-red-300' : 'text-amber-300'}`}>
+                        {countdown.text}
+                      </span>
+                      {' '}— {nextUnbettedMatch.homeTeam.name} vs {nextUnbettedMatch.awayTeam.name}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg shrink-0 ${
+                urgent ? 'bg-red-900/40 text-red-300 border border-red-700/50' : 'bg-amber-900/40 text-amber-300 border border-amber-700/50'
+              }`}>
+                {t.dashboard.placeBets}
+              </span>
+            </div>
+          </Link>
+        );
+      })()}
 
       {/* ── Special bets status ──────────────────────────────────────────── */}
       <div className="card">

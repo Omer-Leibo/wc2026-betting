@@ -1,10 +1,17 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { matchService } from '../services/matchService';
 import { betService } from '../services/betService';
 import MatchCard from '../components/matches/MatchCard';
 import { useLang } from '../i18n/LanguageContext';
+import { useBetAlertStore } from '../store/betAlertStore';
 import type { Match, MatchBet } from '../types';
+
+interface PrevMatchState {
+  homeScore: number | null;
+  awayScore: number | null;
+  status: string;
+}
 
 const GROUPS = ['A','B','C','D','E','F','G','H','I','J','K','L'];
 
@@ -26,11 +33,61 @@ export default function MatchesPage() {
   const [view, setView]               = useState<View>('ALL');
   const [selectedGroup, setSelectedGroup] = useState<string>('A');
 
+  // Track previous match states to detect score changes for toasts
+  const prevStatesRef = useRef<Map<number, PrevMatchState>>(new Map());
+  const updateBetAlert = useBetAlertStore(s => s.update);
+
   const loadData = useCallback(async () => {
     const [m, b] = await Promise.all([matchService.getAll(), betService.getMyBets()]);
+
+    // ── Live score change toasts ───────────────────────────────────────────
+    const prev = prevStatesRef.current;
+    if (prev.size > 0) {
+      for (const match of m) {
+        const p = prev.get(match.id);
+        if (!p) continue;
+
+        const homeScore = match.homeScore ?? null;
+        const awayScore = match.awayScore ?? null;
+
+        // Match just kicked off (UPCOMING → LIVE)
+        if (p.status === 'UPCOMING' && match.status === 'LIVE') {
+          toast(`${match.homeTeam.name} vs ${match.awayTeam.name} kicked off!`, {
+            icon: '🔴',
+            duration: 6000,
+            style: { background: '#0f1f3d', color: '#fff', border: '1px solid rgba(42,57,141,0.7)', fontWeight: 600 },
+          });
+        // Score changed during live game
+        } else if (match.status === 'LIVE' && homeScore !== null && awayScore !== null &&
+          (homeScore !== p.homeScore || awayScore !== p.awayScore)) {
+          toast(`${match.homeTeam.name} ${homeScore}–${awayScore} ${match.awayTeam.name}`, {
+            icon: '⚽',
+            duration: 6000,
+            style: { background: '#0f1f3d', color: '#fff', border: '1px solid rgba(42,57,141,0.7)', fontWeight: 600 },
+          });
+        // Match just finished
+        } else if (p.status === 'LIVE' && match.status === 'FINISHED') {
+          toast(`FT: ${match.homeTeam.name} ${homeScore}–${awayScore} ${match.awayTeam.name}`, {
+            icon: '🏁',
+            duration: 8000,
+            style: { background: '#0f1f3d', color: '#fff', border: '1px solid rgba(42,57,141,0.7)', fontWeight: 600 },
+          });
+        }
+      }
+    }
+    // Update ref for next comparison
+    for (const match of m) {
+      prevStatesRef.current.set(match.id, {
+        homeScore: match.homeScore ?? null,
+        awayScore: match.awayScore ?? null,
+        status: match.status,
+      });
+    }
+
     setMatches(m);
     setBets(b.matchBets);
-  }, []);
+    updateBetAlert(m, b.matchBets);
+  }, [updateBetAlert]);
 
   useEffect(() => {
     loadData()
