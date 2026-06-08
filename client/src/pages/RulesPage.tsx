@@ -7,27 +7,35 @@ export default function RulesPage() {
   const { t } = useLang();
 
   const scoringRows = [
-    { stage: t.matchCard.groupStage, winner: 1,  exact: 3 },
-    { stage: t.matchCard.roundOf32,  winner: 2,  exact: 4 },
-    { stage: t.matchCard.roundOf16,  winner: 2,  exact: 4 },
-    { stage: t.matchCard.quarterFinal, winner: 2, exact: 4 },
-    { stage: t.matchCard.semiFinal,  winner: 3,  exact: 5 },
-    { stage: t.matchCard.thirdPlace, winner: 3,  exact: 5 },
-    { stage: t.matchCard.final,      winner: 3,  exact: 5 },
-  ];
-
-  const accuracyRows = [
-    { label: `23 – 24 ${t.rules.correct}`, pts: 4 },
-    { label: `21 – 22 ${t.rules.correct}`, pts: 3 },
-    { label: `18 – 20 ${t.rules.correct}`, pts: 2 },
-    { label: `${t.rules.below}18`,         pts: 0 },
+    { stage: t.matchCard.groupStage,   winner: 1, exact: 3  },
+    { stage: t.matchCard.roundOf32,    winner: 2, exact: 4  },
+    { stage: t.matchCard.roundOf16,    winner: 2, exact: 5  },
+    { stage: t.matchCard.quarterFinal, winner: 3, exact: 6  },
+    { stage: t.matchCard.semiFinal,    winner: 4, exact: 7  },
+    { stage: t.matchCard.thirdPlace,   winner: 4, exact: 8  },
+    { stage: t.matchCard.final,        winner: 5, exact: 10 },
   ];
 
   const exactRows = [
-    { label: `24 / 24 ${t.rules.exactWord}`, pts: 5 },
-    { label: `18 – 23 ${t.rules.exactWord}`, pts: 4 },
-    { label: `12 – 17 ${t.rules.exactWord}`, pts: 3 },
-    { label: `${t.rules.below}12`,           pts: 0 },
+    { label: `24 ${t.rules.exactWord}`,        pts: 15 },
+    { label: `23 ${t.rules.exactWord}`,         pts: 12 },
+    { label: `20 – 22 ${t.rules.exactWord}`,    pts: 10 },
+    { label: `18 – 19 ${t.rules.exactWord}`,    pts:  8 },
+    { label: `16 – 17 ${t.rules.exactWord}`,    pts:  6 },
+    { label: `14 – 15 ${t.rules.exactWord}`,    pts:  5 },
+    { label: `12 – 13 ${t.rules.exactWord}`,    pts:  4 },
+    { label: `${t.rules.below}12`,              pts:  0 },
+  ];
+
+  const accuracyRows = [
+    { label: `24 ${t.rules.correct}`,           pts: 10 },
+    { label: `23 ${t.rules.correct}`,           pts:  8 },
+    { label: `21 – 22 ${t.rules.correct}`,      pts:  6 },
+    { label: `18 – 20 ${t.rules.correct}`,      pts:  5 },
+    { label: `16 – 17 ${t.rules.correct}`,      pts:  4 },
+    { label: `14 – 15 ${t.rules.correct}`,      pts:  3 },
+    { label: `12 – 13 ${t.rules.correct}`,      pts:  2 },
+    { label: `${t.rules.below}12`,              pts:  0 },
   ];
 
   const specialRows = [

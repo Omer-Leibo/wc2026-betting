@@ -210,7 +210,7 @@ const en = {
     accuracyDesc:     'How many results did you get right (correct or exact)?',
     exactBonusTitle:  'Exact Score Bonus',
     exactBonusDesc:   'How many exact scorelines did you predict correctly?',
-    bothNote:         "Both bonuses can be earned in the same matchday — they're independent of each other. Bonuses are recalculated automatically each time a match result is entered.",
+    bothNote:         "Only the higher of the two bonuses is awarded per matchday — you cannot earn both. Bonuses are recalculated automatically each time a match result is entered.",
     // Special bets section
     specialTitle:     '⭐ Special Bets',
     specialDesc:      'One-time predictions for the tournament as a whole. Place or update them any time before the first kick-off.',
@@ -227,7 +227,7 @@ const en = {
     // Tips
     tipsTitle:        '💡 Tips',
     tip1:             'Exact scores are worth significantly more — even a lucky 0–0 could swing the leaderboard.',
-    tip2:             "Group stage bonuses reward consistency across all 24 games in a matchday — don't neglect the less exciting matches.",
+    tip2:             "Group stage bonuses can be up to +15 pts per matchday — only the higher of the exact-score or accuracy bonus applies, so going for exact scores is usually the better strategy.",
     tip3:             "If you're the only person to predict an exact score, you get an extra bonus point — being contrarian pays off.",
     tip4:             'Special bets are small in points but free wins if you do your research before the tournament starts.',
     tip5:             "Check the All Bets page once a game kicks off to see what everyone else predicted.",
@@ -473,7 +473,7 @@ const he: TranslationDict = {
     accuracyDesc:     'כמה תוצאות ניחשת נכון (נכון או מדויק)?',
     exactBonusTitle:  'בונוס תוצאה מדויקת',
     exactBonusDesc:   'כמה תוצאות מדויקות ניחשת נכון?',
-    bothNote:         'שני הבונוסים ניתן להרוויח באותו מחזור — הם עצמאיים אחד מהשני. הבונוסים מחושבים מחדש אוטומטית בכל פעם שתוצאת משחק מוזנת.',
+    bothNote:         'רק הבונוס הגבוה מבין השניים מוענק בכל מחזור — לא ניתן להרוויח את שניהם. הבונוסים מחושבים מחדש אוטומטית בכל פעם שתוצאת משחק מוזנת.',
     // Special bets section
     specialTitle:     '⭐ הימורים מיוחדים',
     specialDesc:      'תחזיות חד-פעמיות לטורניר כולו. ניתן להניח או לעדכן אותם בכל עת לפני הקיקאוף הראשון.',

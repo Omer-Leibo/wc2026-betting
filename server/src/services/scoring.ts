@@ -13,13 +13,13 @@ function getWinner(home: number, away: number): Winner {
 // ─── Match point table ────────────────────────────────────────────────────────
 
 const MATCH_POINTS: Record<string, { winner: number; exact: number }> = {
-  GROUP:         { winner: 1, exact: 3 },
-  ROUND_OF_32:   { winner: 2, exact: 4 },
-  ROUND_OF_16:   { winner: 2, exact: 4 },
-  QUARTER_FINAL: { winner: 2, exact: 4 },
-  SEMI_FINAL:    { winner: 3, exact: 5 },
-  THIRD_PLACE:   { winner: 3, exact: 5 },
-  FINAL:         { winner: 3, exact: 5 },
+  GROUP:         { winner: 1, exact: 3  },
+  ROUND_OF_32:   { winner: 2, exact: 4  },
+  ROUND_OF_16:   { winner: 2, exact: 5  },
+  QUARTER_FINAL: { winner: 3, exact: 6  },
+  SEMI_FINAL:    { winner: 4, exact: 7  },
+  THIRD_PLACE:   { winner: 4, exact: 8  },
+  FINAL:         { winner: 5, exact: 10 },
 };
 
 const SPECIAL_POINTS = { CHAMPION: 10, TOP_SCORER: 12, TOP_ASSISTS: 15 };
@@ -91,6 +91,30 @@ export async function scoreMatch(matchId: number): Promise<void> {
 // Bonuses are stored in BonusLog (not injected into MatchBet rows) so the
 // leaderboard can show them as a separate column.
 
+// ─── Bonus ladders (shared between final scoring and provisional display) ─────
+
+function exactScoreLadder(exactCount: number): number {
+  if (exactCount >= 24) return 15;
+  if (exactCount >= 23) return 12;
+  if (exactCount >= 20) return 10;
+  if (exactCount >= 18) return  8;
+  if (exactCount >= 16) return  6;
+  if (exactCount >= 14) return  5;
+  if (exactCount >= 12) return  4;
+  return 0;
+}
+
+function accuracyLadder(correctCount: number): number {
+  if (correctCount >= 24) return 10;
+  if (correctCount >= 23) return  8;
+  if (correctCount >= 21) return  6;
+  if (correctCount >= 18) return  5;
+  if (correctCount >= 16) return  4;
+  if (correctCount >= 14) return  3;
+  if (correctCount >= 12) return  2;
+  return 0;
+}
+
 async function scoreGroupRoundBonuses(groupRound: number): Promise<void> {
   const roundMatches = await prisma.match.findMany({
     where: { stage: 'GROUP', groupRound },
@@ -104,7 +128,7 @@ async function scoreGroupRoundBonuses(groupRound: number): Promise<void> {
   const users = await prisma.user.findMany({ select: { id: true } });
 
   for (const user of users) {
-    // Remove any existing bonus for this round (idempotent)
+    // Remove any existing bonus for this round (idempotent — clears both old and new format)
     await prisma.bonusLog.deleteMany({
       where: { userId: user.id, reason: { startsWith: `R${groupRound}_` } },
     });
@@ -126,26 +150,12 @@ async function scoreGroupRoundBonuses(groupRound: number): Promise<void> {
       if (isExact) exactCount++;
     }
 
-    // Accuracy ladder: how many results (correct winner OR exact) did they get right
-    let accuracyBonus = 0;
-    if (correctCount >= 23)      accuracyBonus = 4;
-    else if (correctCount >= 21) accuracyBonus = 3;
-    else if (correctCount >= 18) accuracyBonus = 2;
+    // Only the higher of the two bonuses applies
+    const bonus = Math.max(exactScoreLadder(exactCount), accuracyLadder(correctCount));
 
-    // Exact score ladder
-    let exactBonus = 0;
-    if (exactCount >= 24)      exactBonus = 5;
-    else if (exactCount >= 18) exactBonus = 4;
-    else if (exactCount >= 12) exactBonus = 3;
-
-    if (accuracyBonus > 0) {
+    if (bonus > 0) {
       await prisma.bonusLog.create({
-        data: { userId: user.id, points: accuracyBonus, reason: `R${groupRound}_ACCURACY` },
-      });
-    }
-    if (exactBonus > 0) {
-      await prisma.bonusLog.create({
-        data: { userId: user.id, points: exactBonus, reason: `R${groupRound}_EXACT_LADDER` },
+        data: { userId: user.id, points: bonus, reason: `R${groupRound}_BONUS` },
       });
     }
   }
@@ -325,19 +335,11 @@ export async function getLeaderboard(requestingUserId?: number) {
           if (isExact) exactCount++;
         }
 
-        // Accuracy ladder
-        let accBonus = 0;
-        if (correctCount >= 23)      accBonus = 4;
-        else if (correctCount >= 21) accBonus = 3;
-        else if (correctCount >= 18) accBonus = 2;
-
-        // Exact ladder
-        let exBonus = 0;
-        if (exactCount >= 24)      exBonus = 5;
-        else if (exactCount >= 18) exBonus = 4;
-        else if (exactCount >= 12) exBonus = 3;
-
-        provisionalBonusPoints += accBonus + exBonus;
+        // Only the higher of the two bonuses applies (same logic as final scoring)
+        provisionalBonusPoints += Math.max(
+          exactScoreLadder(exactCount),
+          accuracyLadder(correctCount),
+        );
       }
     }
 
