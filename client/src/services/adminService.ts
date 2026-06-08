@@ -6,6 +6,7 @@ export interface AdminUser {
   username: string;
   email: string;
   role: 'USER' | 'ADMIN';
+  status: 'PENDING' | 'ACTIVE' | 'REJECTED';
   createdAt: string;
   _count: { matchBets: number; specialBets: number };
 }
@@ -53,6 +54,14 @@ export const adminService = {
 
   async updateUserRole(id: number, role: 'USER' | 'ADMIN'): Promise<void> {
     await api.patch(`/admin/users/${id}/role`, { role });
+  },
+
+  async approveUser(id: number): Promise<void> {
+    await api.patch(`/admin/users/${id}/status`, { status: 'ACTIVE' });
+  },
+
+  async rejectUser(id: number): Promise<void> {
+    await api.patch(`/admin/users/${id}/status`, { status: 'REJECTED' });
   },
 
   async getPendingMatches(): Promise<Match[]> {

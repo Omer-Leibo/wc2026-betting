@@ -56,14 +56,16 @@ router.post('/register', async (req: Request, res: Response): Promise<void> => {
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
-  const user = await prisma.user.create({
-    data: { username, email, password: hashedPassword },
-    select: { id: true, username: true, email: true, role: true },
+  await prisma.user.create({
+    data: { username, email, password: hashedPassword, status: 'PENDING' },
+    select: { id: true },
   });
 
-  const token = jwt.sign({ userId: user.id, role: user.role }, process.env.JWT_SECRET!, { expiresIn: '7d' });
-
-  res.status(201).json({ token, user });
+  // Account created but PENDING — don't issue a JWT until the admin approves
+  res.status(201).json({
+    pending: true,
+    message: "Account created! Your registration is pending admin approval. You'll be able to log in once approved.",
+  });
 });
 
 // ─── POST /api/auth/login ─────────────────────────────────────────────────────
@@ -87,6 +89,16 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) {
     res.status(401).json({ message: 'Invalid email or password' });
+    return;
+  }
+
+  // Block non-active accounts
+  if (user.status === 'PENDING') {
+    res.status(403).json({ message: 'Your account is awaiting admin approval. Please check back later.' });
+    return;
+  }
+  if (user.status === 'REJECTED') {
+    res.status(403).json({ message: 'Your registration was declined. Contact the admin for more information.' });
     return;
   }
 

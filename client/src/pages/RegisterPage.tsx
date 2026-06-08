@@ -1,35 +1,67 @@
 import { useState, FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { authService } from '../services/authService';
-import { useAuthStore } from '../store/authStore';
 import { useLang } from '../i18n/LanguageContext';
 
 export default function RegisterPage() {
-  const navigate = useNavigate();
-  const { setAuth } = useAuthStore();
   const { t } = useLang();
   const [username, setUsername] = useState('');
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm]   = useState('');
   const [loading, setLoading]   = useState(false);
+  const [pending, setPending]   = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (password !== confirm) { toast.error('Passwords do not match'); return; }
     setLoading(true);
     try {
-      const { user, token } = await authService.register(username, email, password);
-      setAuth(user, token);
-      toast.success(`${t.auth.createAccount}! ${user.username} 🎉`);
-      navigate('/');
+      const result = await authService.register(username, email, password);
+      if ('pending' in result && result.pending) {
+        setPending(true); // show the approval-pending screen
+      }
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
   };
+
+  // ── Pending approval screen ────────────────────────────────────────────────
+  if (pending) {
+    return (
+      <div className="flex items-center justify-center min-h-screen px-4 relative overflow-hidden">
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: `
+            radial-gradient(ellipse 60% 55% at 85% 10%,  rgba(230,29,37,0.30)  0%, transparent 65%),
+            radial-gradient(ellipse 55% 50% at 15% 90%,  rgba(60,172,59,0.25)  0%, transparent 65%),
+            radial-gradient(ellipse 40% 35% at 20% 15%,  rgba(42,57,141,0.30)  0%, transparent 55%)
+          `,
+        }} />
+        <div className="w-full max-w-sm relative z-10 animate-fade-up text-center space-y-5">
+          <img src="/wc2026-official-logo.png" alt="FIFA World Cup 2026"
+            className="h-24 w-auto mx-auto"
+            style={{ filter: 'drop-shadow(0 0 20px rgba(245,166,35,0.45))' }}
+          />
+          <div className="card-glow space-y-4 text-center">
+            <div className="text-5xl">⏳</div>
+            <h2 className="font-heading text-xl font-bold text-white">Pending Approval</h2>
+            <p className="text-gray-400 text-sm leading-relaxed">
+              Your account <span className="text-white font-semibold">{username}</span> has been created and is waiting for admin approval.
+              <br /><br />
+              You'll be able to log in once the admin reviews your request.
+            </p>
+            <Link to="/login" className="btn-secondary w-full block text-center py-2">
+              Back to Login
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center justify-center min-h-screen px-4 relative overflow-hidden">

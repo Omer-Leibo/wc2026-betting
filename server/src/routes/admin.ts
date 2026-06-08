@@ -18,7 +18,7 @@ router.use(authenticate, requireAdmin);
 router.get('/users', async (_req: AuthRequest, res: Response): Promise<void> => {
   const users = await prisma.user.findMany({
     select: {
-      id: true, username: true, email: true, role: true, createdAt: true,
+      id: true, username: true, email: true, role: true, status: true, createdAt: true,
       _count: { select: { matchBets: true, specialBets: true } },
     },
     orderBy: { createdAt: 'asc' },
@@ -64,6 +64,27 @@ router.patch('/users/:id/role', async (req: AuthRequest, res: Response): Promise
     where: { id },
     data: { role: parse.data.role },
     select: { id: true, username: true, role: true },
+  });
+  res.json({ user });
+});
+
+// ─── PATCH /api/admin/users/:id/status  (approve / reject) ───────────────────
+
+const statusSchema = z.object({ status: z.enum(['ACTIVE', 'REJECTED']) });
+
+router.patch('/users/:id/status', async (req: AuthRequest, res: Response): Promise<void> => {
+  const parse = statusSchema.safeParse(req.body);
+  if (!parse.success) { res.status(400).json({ message: 'Invalid status' }); return; }
+
+  const id = parseInt(req.params.id as string);
+  if (id === req.userId) {
+    res.status(400).json({ message: 'Cannot change your own status' }); return;
+  }
+
+  const user = await prisma.user.update({
+    where: { id },
+    data: { status: parse.data.status },
+    select: { id: true, username: true, status: true },
   });
   res.json({ user });
 });

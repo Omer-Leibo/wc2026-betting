@@ -12,6 +12,12 @@ enum Role {
   ADMIN
 }
 
+enum UserStatus {
+  PENDING
+  ACTIVE
+  REJECTED
+}
+
 enum Stage {
   GROUP
   ROUND_OF_32
@@ -35,13 +41,14 @@ enum SpecialBetType {
 }
 
 model User {
-  id          Int      @id @default(autoincrement())
-  username    String   @unique
-  email       String   @unique
+  id          Int        @id @default(autoincrement())
+  username    String     @unique
+  email       String     @unique
   password    String
-  role        Role     @default(USER)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  role        Role       @default(USER)
+  status      UserStatus @default(PENDING)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   matchBets   MatchBet[]
   specialBets SpecialBet[]

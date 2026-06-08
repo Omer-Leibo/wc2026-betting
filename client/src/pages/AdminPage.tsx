@@ -144,6 +144,32 @@ export default function AdminPage() {
     } finally { setBackingUp(false); }
   };
 
+  // ── Approve / reject user ─────────────────────────────────────────────────
+  const [approvingId, setApprovingId] = useState<number | null>(null);
+
+  const handleApprove = async (id: number, username: string) => {
+    setApprovingId(id);
+    try {
+      await adminService.approveUser(id);
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, status: 'ACTIVE' as const } : u));
+      toast.success(`✅ ${username} approved — they can now log in`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to approve user');
+    } finally { setApprovingId(null); }
+  };
+
+  const handleReject = async (id: number, username: string) => {
+    if (!confirm(`Reject "${username}"? They will be blocked from logging in.`)) return;
+    setApprovingId(id);
+    try {
+      await adminService.rejectUser(id);
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, status: 'REJECTED' as const } : u));
+      toast.success(`${username} rejected`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to reject user');
+    } finally { setApprovingId(null); }
+  };
+
   // ── Delete user ──────────────────────────────────────────────────────────
   const handleDeleteUser = async (id: number, username: string) => {
     if (!confirm(`Delete user "${username}"? This cannot be undone.`)) return;
@@ -224,7 +250,14 @@ export default function AdminPage() {
         <button className={tabClass('overview')} onClick={() => setTab('overview')}>Overview</button>
         <button className={tabClass('results')}  onClick={() => setTab('results')}>Enter Results</button>
         <button className={tabClass('special')}  onClick={() => setTab('special')}>Special Results</button>
-        <button className={tabClass('users')}    onClick={() => setTab('users')}>Users</button>
+        <button className={tabClass('users')}    onClick={() => setTab('users')}>
+          Users
+          {users.filter(u => u.status === 'PENDING').length > 0 && (
+            <span className="ml-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-black text-[10px] font-bold inline-flex items-center justify-center leading-none">
+              {users.filter(u => u.status === 'PENDING').length}
+            </span>
+          )}
+        </button>
         <button className={tabClass('sync')}     onClick={() => setTab('sync')}>
           🔄 Live Sync
           {syncStatus?.lastSync && (
@@ -395,37 +428,113 @@ export default function AdminPage() {
       )}
 
       {/* ── USERS ────────────────────────────────────────────────────────── */}
-      {tab === 'users' && (
-        <div className="space-y-2">
-          {users.map(u => (
-            <div key={u.id} className="card flex items-center gap-4">
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-white">
-                  {u.username}
-                  {u.role === 'ADMIN' && <span className="ml-2 text-xs bg-yellow-600 text-white px-1.5 py-0.5 rounded-full">Admin</span>}
-                </p>
-                <p className="text-sm text-gray-500">{u.email}</p>
-                <p className="text-xs text-gray-600 mt-0.5">
-                  {u._count.matchBets} match bets · {u._count.specialBets} special bets · joined {dayjs(u.createdAt).format('D MMM YYYY')}
-                </p>
+      {tab === 'users' && (() => {
+        const pendingUsers  = users.filter(u => u.status === 'PENDING');
+        const rejectedUsers = users.filter(u => u.status === 'REJECTED');
+        const activeUsers   = users.filter(u => u.status === 'ACTIVE');
+        return (
+          <div className="space-y-4">
+
+            {/* ── Pending approvals ─────────────────────────────────────── */}
+            {pendingUsers.length > 0 && (
+              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(245,158,11,0.5)' }}>
+                <div className="px-4 py-2 flex items-center gap-2" style={{ background: 'rgba(245,158,11,0.15)' }}>
+                  <span className="text-amber-400 font-semibold text-sm">⏳ Pending Approval</span>
+                  <span className="text-xs text-amber-500">({pendingUsers.length})</span>
+                </div>
+                <div className="divide-y divide-gray-800">
+                  {pendingUsers.map(u => (
+                    <div key={u.id} className="flex items-center gap-4 px-4 py-3" style={{ background: 'rgba(245,158,11,0.05)' }}>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-white">{u.username}</p>
+                        <p className="text-sm text-gray-400">{u.email}</p>
+                        <p className="text-xs text-gray-600 mt-0.5">Registered {dayjs(u.createdAt).format('D MMM YYYY · HH:mm')}</p>
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          onClick={() => handleApprove(u.id, u.username)}
+                          disabled={approvingId === u.id}
+                          className="text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors"
+                          style={{ background: 'rgba(34,197,94,0.2)', border: '1px solid rgba(34,197,94,0.5)', color: '#86efac' }}
+                        >
+                          {approvingId === u.id ? '…' : '✓ Approve'}
+                        </button>
+                        <button
+                          onClick={() => handleReject(u.id, u.username)}
+                          disabled={approvingId === u.id}
+                          className="text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors"
+                          style={{ background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.5)', color: '#fca5a5' }}
+                        >
+                          ✗ Reject
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="flex gap-2 shrink-0">
-                <button
-                  onClick={() => handleResetPassword(u.id, u.username)}
-                  disabled={resettingId === u.id}
-                  className="btn-secondary text-xs py-1.5 px-3"
-                  title="Reset password"
-                >
-                  {resettingId === u.id ? '…' : '🔑 Reset PW'}
-                </button>
-                <button onClick={() => handleDeleteUser(u.id, u.username)} className="btn-danger text-xs py-1.5 px-3">
-                  Delete
-                </button>
-              </div>
+            )}
+
+            {/* ── Active users ──────────────────────────────────────────── */}
+            <div className="space-y-2">
+              {activeUsers.map(u => (
+                <div key={u.id} className="card flex items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-white">
+                      {u.username}
+                      {u.role === 'ADMIN' && <span className="ml-2 text-xs bg-yellow-600 text-white px-1.5 py-0.5 rounded-full">Admin</span>}
+                    </p>
+                    <p className="text-sm text-gray-500">{u.email}</p>
+                    <p className="text-xs text-gray-600 mt-0.5">
+                      {u._count.matchBets} match bets · {u._count.specialBets} special bets · joined {dayjs(u.createdAt).format('D MMM YYYY')}
+                    </p>
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => handleResetPassword(u.id, u.username)}
+                      disabled={resettingId === u.id}
+                      className="btn-secondary text-xs py-1.5 px-3"
+                      title="Reset password"
+                    >
+                      {resettingId === u.id ? '…' : '🔑 Reset PW'}
+                    </button>
+                    <button onClick={() => handleDeleteUser(u.id, u.username)} className="btn-danger text-xs py-1.5 px-3">
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      )}
+
+            {/* ── Rejected users ────────────────────────────────────────── */}
+            {rejectedUsers.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs text-gray-600 uppercase tracking-wider font-semibold px-1">Rejected ({rejectedUsers.length})</p>
+                {rejectedUsers.map(u => (
+                  <div key={u.id} className="card flex items-center gap-4 opacity-50">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-400 line-through">{u.username}</p>
+                      <p className="text-sm text-gray-600">{u.email}</p>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        onClick={() => handleApprove(u.id, u.username)}
+                        disabled={approvingId === u.id}
+                        className="text-xs px-3 py-1.5 rounded-lg font-semibold transition-colors"
+                        style={{ background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.4)', color: '#86efac' }}
+                      >
+                        Approve
+                      </button>
+                      <button onClick={() => handleDeleteUser(u.id, u.username)} className="btn-danger text-xs py-1.5 px-3">
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ── LIVE SYNC ────────────────────────────────────────────────────── */}
       {tab === 'sync' && (
