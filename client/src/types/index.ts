@@ -122,6 +122,33 @@ export interface LeaderboardEntry {
   };
 }
 
+// ─── Head-to-head comparison ──────────────────────────────────────────────────
+
+export interface CompareBet {
+  predictedHome: number;
+  predictedAway: number;
+  pointsAwarded: number | null;
+}
+
+export interface CompareMatch {
+  id: number;
+  homeTeam: Team;
+  awayTeam: Team;
+  homeScore: number | null;
+  awayScore: number | null;
+  status: MatchStatus;
+  matchDate: string;
+  stage: Stage;
+  groupRound?: number;
+  myBet: CompareBet | null;
+  theirBet: CompareBet | null;
+}
+
+export interface CompareData {
+  matches: CompareMatch[];
+  opponent: { id: number; username: string };
+}
+
 // ─── Standings ────────────────────────────────────────────────────────────────
 
 export interface TeamStanding {
