@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
-import { scoreMatch, scoreSpecialBets, scoreGroupRoundBonuses } from '../services/scoring';
+import { scoreMatch, scoreSpecialBets, scoreGroupRoundBonuses, takeLeaderboardSnapshot } from '../services/scoring';
 import { syncAllFixtures, syncLiveFixtures, syncPlayers, getLastSync } from '../services/syncService';
 import { fetchQuota } from '../services/footballApi';
 import { runBackup, listBackups, getBackupPath } from '../services/backupService';
@@ -155,6 +155,17 @@ router.post('/special-results', async (req: AuthRequest, res: Response): Promise
 
   await scoreSpecialBets(parse.data.type, parse.data.winnerTeamId, parse.data.winnerPlayerName);
   res.json({ message: `${parse.data.type} bets scored successfully` });
+});
+
+// ─── POST /api/admin/take-snapshot  (manual leaderboard snapshot) ─────────────
+
+const snapshotLabelSchema = z.object({ label: z.string().min(1).max(20) });
+
+router.post('/take-snapshot', async (req: AuthRequest, res: Response): Promise<void> => {
+  const parse = snapshotLabelSchema.safeParse(req.body);
+  if (!parse.success) { res.status(400).json({ message: 'label is required (max 20 chars)' }); return; }
+  await takeLeaderboardSnapshot(parse.data.label);
+  res.json({ message: `Snapshot "${parse.data.label}" saved for all users` });
 });
 
 // ─── GET /api/admin/stats ─────────────────────────────────────────────────────

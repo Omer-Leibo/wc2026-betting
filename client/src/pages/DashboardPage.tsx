@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { betService } from '../services/betService';
 import { matchService } from '../services/matchService';
-import { leaderboardService } from '../services/leaderboardService';
+import { leaderboardService, type RankSnapshotEntry } from '../services/leaderboardService';
 import { authService } from '../services/authService';
 import { useAuthStore } from '../store/authStore';
 import { useBetAlertStore } from '../store/betAlertStore';
@@ -21,6 +21,73 @@ function formatTimeUntil(dateStr: string): { text: string; urgent: boolean } {
   const mins  = totalMins % 60;
   const text  = days >= 1 ? `${days}d ${hours}h` : hours >= 1 ? `${hours}h ${mins}m` : `${mins}m`;
   return { text, urgent: ms < 60 * 60 * 1000 };
+}
+
+// ── Rank history chart ──────────────────────────────────────────────────────
+
+function RankHistoryChart({ snapshots }: { snapshots: RankSnapshotEntry[] }) {
+  if (snapshots.length < 2) return null;
+
+  const W = 440, H = 110;
+  const PAD = { top: 12, right: 16, bottom: 24, left: 28 };
+  const innerW = W - PAD.left - PAD.right;
+  const innerH = H - PAD.top - PAD.bottom;
+
+  const ranks   = snapshots.map(s => s.rank);
+  const minRank = Math.min(...ranks);
+  const maxRank = Math.max(...ranks);
+  const rankRange = maxRank - minRank || 1;
+
+  const xOf = (i: number) => PAD.left + (i / (snapshots.length - 1)) * innerW;
+  // Invert: rank 1 (best) maps to y=PAD.top, rank N (worst) to y=PAD.top+innerH
+  const yOf = (r: number) => PAD.top + ((r - minRank) / rankRange) * innerH;
+
+  const pts = snapshots.map((s, i) => `${xOf(i)},${yOf(s.rank)}`);
+  const linePath = `M ${pts.join(' L ')}`;
+
+  // Shaded area under the line
+  const areaPath = `M ${xOf(0)},${PAD.top + innerH} L ${pts.join(' L ')} L ${xOf(snapshots.length - 1)},${PAD.top + innerH} Z`;
+
+  const last = snapshots[snapshots.length - 1];
+  const secondLast = snapshots[snapshots.length - 2];
+  const improving = last.rank < secondLast.rank; // lower rank number = better
+
+  return (
+    <div className="rounded-xl px-4 pt-3 pb-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-xs font-semibold text-gray-400">Rank History</p>
+        <p className="text-xs font-bold" style={{ color: improving ? '#7ada7c' : '#ff8080' }}>
+          #{last.rank} {improving ? '↑' : last.rank === secondLast.rank ? '→' : '↓'}
+        </p>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ maxHeight: 110 }}>
+        {/* Area fill */}
+        <path d={areaPath} fill="rgba(122,159,255,0.08)" />
+        {/* Line */}
+        <path d={linePath} fill="none" stroke="#7a9fff" strokeWidth="2" strokeLinejoin="round" />
+        {/* Dots */}
+        {snapshots.map((s, i) => (
+          <circle key={i} cx={xOf(i)} cy={yOf(s.rank)} r={i === snapshots.length - 1 ? 5 : 3.5}
+            fill={i === snapshots.length - 1 ? '#7a9fff' : '#0d1526'}
+            stroke="#7a9fff" strokeWidth={i === snapshots.length - 1 ? 2 : 1.5} />
+        ))}
+        {/* X labels */}
+        {snapshots.map((s, i) => (
+          <text key={i} x={xOf(i)} y={H - 4} textAnchor="middle"
+            fill="#6b7280" fontSize="9" fontFamily="sans-serif">
+            {s.label}
+          </text>
+        ))}
+        {/* Y axis labels (rank numbers) */}
+        {minRank !== maxRank && [minRank, maxRank].map(r => (
+          <text key={r} x={PAD.left - 4} y={yOf(r) + 4} textAnchor="end"
+            fill="#4b5563" fontSize="9" fontFamily="sans-serif">
+            #{r}
+          </text>
+        ))}
+      </svg>
+    </div>
+  );
 }
 
 // ── Colorful stat card ──────────────────────────────────────────────────────
@@ -57,10 +124,11 @@ function StatCard({
 export default function DashboardPage() {
   const { user } = useAuthStore();
   const { t } = useLang();
-  const [matchBets, setMatchBets]     = useState<MatchBet[]>([]);
-  const [specialBets, setSpecialBets] = useState<SpecialBet[]>([]);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [loading, setLoading]         = useState(true);
+  const [matchBets, setMatchBets]         = useState<MatchBet[]>([]);
+  const [specialBets, setSpecialBets]     = useState<SpecialBet[]>([]);
+  const [leaderboard, setLeaderboard]     = useState<LeaderboardEntry[]>([]);
+  const [rankHistory, setRankHistory]     = useState<RankSnapshotEntry[]>([]);
+  const [loading, setLoading]             = useState(true);
 
   // Countdown tick — re-renders countdown text every 30 s
   const [, setTick] = useState(0);
@@ -95,11 +163,12 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    Promise.all([betService.getMyBets(), leaderboardService.get(), matchService.getAll()])
-      .then(([bets, lb, matches]) => {
+    Promise.all([betService.getMyBets(), leaderboardService.get(), matchService.getAll(), leaderboardService.getHistory()])
+      .then(([bets, lb, matches, history]) => {
         setMatchBets(bets.matchBets);
         setSpecialBets(bets.specialBets);
         setLeaderboard(lb.entries);
+        setRankHistory(history);
         updateBetAlert(matches, bets.matchBets);
       })
       .catch(() => toast.error('Failed to load dashboard'))
@@ -200,6 +269,9 @@ export default function DashboardPage() {
         <StatCard label={t.dashboard.exactScores} value={myEntry?.exactScores ?? 0} sub={t.dashboard.allTime} variant="green" />
         <StatCard label={t.dashboard.correctResults} value={myEntry?.correctScores ?? 0} sub={t.dashboard.allTime} variant="red" />
       </div>
+
+      {/* ── Rank history chart ───────────────────────────────────────────── */}
+      <RankHistoryChart snapshots={rankHistory} />
 
       {/* ── Bet completion progress bar ──────────────────────────────────── */}
       {totalMatchCount > 0 && (() => {

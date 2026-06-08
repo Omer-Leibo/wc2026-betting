@@ -38,6 +38,22 @@ export default function AdminPage() {
   const [specialPlayer, setSpecialPlayer] = useState('');
   const [savingSpecial, setSavingSpecial] = useState(false);
 
+  // Snapshot state
+  const [snapshotLabel, setSnapshotLabel] = useState('');
+  const [takingSnapshot, setTakingSnapshot] = useState(false);
+
+  const handleTakeSnapshot = async () => {
+    if (!snapshotLabel.trim()) { toast.error('Enter a label first'); return; }
+    setTakingSnapshot(true);
+    try {
+      await adminService.takeSnapshot(snapshotLabel.trim());
+      toast.success(`Snapshot "${snapshotLabel.trim()}" saved!`);
+      setSnapshotLabel('');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to save snapshot');
+    } finally { setTakingSnapshot(false); }
+  };
+
   // Sync state
   const [syncStatus, setSyncStatus]       = useState<SyncStatus | null>(null);
   const [syncing, setSyncing]             = useState(false);
@@ -298,18 +314,60 @@ export default function AdminPage() {
 
       {/* ── OVERVIEW ─────────────────────────────────────────────────────── */}
       {tab === 'overview' && stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: 'Participants', value: stats.userCount },
-            { label: 'Total Matches', value: stats.matchCount },
-            { label: 'Finished', value: stats.finishedCount },
-            { label: 'Total Bets', value: stats.betCount },
-          ].map(({ label, value }) => (
-            <div key={label} className="card text-center">
-              <p className="text-3xl font-bold text-white">{value}</p>
-              <p className="text-sm text-gray-400 mt-1">{label}</p>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: 'Participants', value: stats.userCount },
+              { label: 'Total Matches', value: stats.matchCount },
+              { label: 'Finished', value: stats.finishedCount },
+              { label: 'Total Bets', value: stats.betCount },
+            ].map(({ label, value }) => (
+              <div key={label} className="card text-center">
+                <p className="text-3xl font-bold text-white">{value}</p>
+                <p className="text-sm text-gray-400 mt-1">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Take Leaderboard Snapshot ─────────────────────────────── */}
+          <div className="card space-y-3 max-w-md">
+            <div>
+              <h2 className="font-semibold">📸 Leaderboard Snapshot</h2>
+              <p className="text-xs text-gray-400 mt-1">
+                Capture the current rankings so players can track their history.
+                Snapshots are taken automatically at end of each group matchday — use this for knockouts (e.g. "R32", "R16", "QF").
+              </p>
             </div>
-          ))}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                className="input flex-1 text-sm"
+                placeholder='Label, e.g. "R32" or "QF"'
+                maxLength={20}
+                value={snapshotLabel}
+                onChange={e => setSnapshotLabel(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleTakeSnapshot()}
+              />
+              <button
+                onClick={handleTakeSnapshot}
+                disabled={takingSnapshot || !snapshotLabel.trim()}
+                className="btn-primary text-sm px-4 shrink-0"
+              >
+                {takingSnapshot ? '⏳' : '📸 Save'}
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {['R32', 'R16', 'QF', 'SF', 'Final'].map(label => (
+                <button
+                  key={label}
+                  onClick={() => setSnapshotLabel(label)}
+                  className="text-xs px-2 py-0.5 rounded-md bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 

@@ -159,6 +159,25 @@ export async function scoreGroupRoundBonuses(groupRound: number): Promise<void> 
       });
     }
   }
+
+  // Auto-snapshot the leaderboard standings after each completed group round
+  await takeLeaderboardSnapshot(`MD ${groupRound}`);
+}
+
+// ─── Rank snapshots ───────────────────────────────────────────────────────────
+//
+// Saves the current leaderboard standings as a named snapshot so the
+// Dashboard can draw a "rank over time" chart for each user.
+
+export async function takeLeaderboardSnapshot(label: string): Promise<void> {
+  const { entries } = await getLeaderboard();
+  for (const entry of entries) {
+    await prisma.rankSnapshot.upsert({
+      where:  { userId_label: { userId: entry.userId, label } },
+      update: { rank: entry.rank, totalPoints: entry.totalPoints },
+      create: { userId: entry.userId, label, rank: entry.rank, totalPoints: entry.totalPoints },
+    });
+  }
 }
 
 // ─── Score special bets ───────────────────────────────────────────────────────

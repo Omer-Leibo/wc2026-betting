@@ -91,6 +91,10 @@ export const adminService = {
     await api.post('/admin/rescore-group-round', { round });
   },
 
+  async takeSnapshot(label: string): Promise<void> {
+    await api.post('/admin/take-snapshot', { label });
+  },
+
   async getStats(): Promise<AdminStats> {
     const { data } = await api.get<{ stats: AdminStats }>('/admin/stats');
     return data.stats;

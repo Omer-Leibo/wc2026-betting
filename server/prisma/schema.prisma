@@ -50,9 +50,10 @@ model User {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  matchBets   MatchBet[]
-  specialBets SpecialBet[]
-  bonusLogs   BonusLog[]
+  matchBets      MatchBet[]
+  specialBets    SpecialBet[]
+  bonusLogs      BonusLog[]
+  rankSnapshots  RankSnapshot[]
 }
 
 model BonusLog {
@@ -60,8 +61,20 @@ model BonusLog {
   userId    Int
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   points    Int
-  reason    String   // e.g. "ACCURACY_R1", "EXACT_LADDER_R2"
+  reason    String   // e.g. "R1_BONUS", "UNIQUE_EXACT_<matchId>"
   createdAt DateTime @default(now())
+}
+
+model RankSnapshot {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label       String   // e.g. "MD 1", "MD 2", "MD 3", "R32", "R16", "QF", "SF", "Final"
+  rank        Int
+  totalPoints Int
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, label])
 }
 
 model Team {
