@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
+import { useBetAlertStore } from '../../store/betAlertStore';
 import { useLang } from '../../i18n/LanguageContext';
 
 // ── Language toggle button ─────────────────────────────────────────────────────
@@ -36,6 +37,7 @@ export default function Layout() {
   const navigate           = useNavigate();
   const { t, isRTL }       = useLang();
   const [menuOpen, setMenuOpen] = useState(false);
+  const unbettedCount = useBetAlertStore(s => s.unbettedCount);
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
@@ -114,20 +116,28 @@ export default function Layout() {
 
           {/* Desktop links */}
           <div className="hidden md:flex items-center gap-0.5">
-            {links.map((l, i) => (
-              <NavLink
-                key={l.to}
-                to={l.to}
-                end={l.end}
-                className={({ isActive }) =>
-                  isActive
-                    ? `px-3 py-1.5 rounded-lg text-sm font-heading font-bold tracking-wide transition-all text-white bg-gradient-to-r ${LINK_COLORS[i] ?? 'from-primary-600 to-primary-800'} shadow-lg`
-                    : 'px-3 py-1.5 rounded-lg text-sm font-heading font-semibold tracking-wide transition-all text-gray-400 hover:text-white hover:bg-white/10'
-                }
-              >
-                {l.label}
-              </NavLink>
-            ))}
+            {links.map((l, i) => {
+              const showBadge = l.to === '/matches' && unbettedCount > 0;
+              return (
+                <NavLink
+                  key={l.to}
+                  to={l.to}
+                  end={l.end}
+                  className={({ isActive }) =>
+                    isActive
+                      ? `relative px-3 py-1.5 rounded-lg text-sm font-heading font-bold tracking-wide transition-all text-white bg-gradient-to-r ${LINK_COLORS[i] ?? 'from-primary-600 to-primary-800'} shadow-lg`
+                      : 'relative px-3 py-1.5 rounded-lg text-sm font-heading font-semibold tracking-wide transition-all text-gray-400 hover:text-white hover:bg-white/10'
+                  }
+                >
+                  {l.label}
+                  {showBadge && (
+                    <span className="absolute -top-1.5 -right-1 min-w-[17px] h-[17px] px-0.5 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center leading-none shadow">
+                      {unbettedCount > 99 ? '99+' : unbettedCount}
+                    </span>
+                  )}
+                </NavLink>
+              );
+            })}
           </div>
 
           {/* Right side */}
@@ -177,21 +187,29 @@ export default function Layout() {
             className="md:hidden mt-3 space-y-1 pt-3 max-w-7xl mx-auto"
             style={{ borderTop: '1px solid rgba(42,57,141,0.3)' }}
           >
-            {links.map((l, i) => (
-              <NavLink
-                key={l.to}
-                to={l.to}
-                end={l.end}
-                className={({ isActive }) =>
-                  isActive
-                    ? `block px-4 py-3 rounded-lg text-base font-heading font-bold tracking-wide text-white bg-gradient-to-r ${LINK_COLORS[i] ?? 'from-primary-600 to-primary-800'}`
-                    : 'block px-4 py-3 rounded-lg text-base font-heading font-semibold text-gray-300 hover:text-white hover:bg-white/10 transition-colors'
-                }
-                onClick={() => setMenuOpen(false)}
-              >
-                {l.label}
-              </NavLink>
-            ))}
+            {links.map((l, i) => {
+              const showBadge = l.to === '/matches' && unbettedCount > 0;
+              return (
+                <NavLink
+                  key={l.to}
+                  to={l.to}
+                  end={l.end}
+                  className={({ isActive }) =>
+                    isActive
+                      ? `flex items-center justify-between px-4 py-3 rounded-lg text-base font-heading font-bold tracking-wide text-white bg-gradient-to-r ${LINK_COLORS[i] ?? 'from-primary-600 to-primary-800'}`
+                      : 'flex items-center justify-between px-4 py-3 rounded-lg text-base font-heading font-semibold text-gray-300 hover:text-white hover:bg-white/10 transition-colors'
+                  }
+                  onClick={() => setMenuOpen(false)}
+                >
+                  {l.label}
+                  {showBadge && (
+                    <span className="min-w-[20px] h-5 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                      {unbettedCount > 99 ? '99+' : unbettedCount}
+                    </span>
+                  )}
+                </NavLink>
+              );
+            })}
             <div
               className="pt-3 mt-2 flex items-center justify-between px-1"
               style={{ borderTop: '1px solid rgba(42,57,141,0.3)' }}

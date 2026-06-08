@@ -71,6 +71,9 @@ const en = {
     confirmPassword:  'Confirm new password',
     changePasswordBtn:'Update Password',
     saving:           'Saving…',
+    unbettedOne:      'upcoming match without a bet',
+    unbettedMany:     'upcoming matches without a bet',
+    nextKicksOff:     'Next kicks off in',
   },
   // ── Matches ─────────────────────────────────────────────────────────────────
   matches: {
@@ -320,6 +323,9 @@ const he: TranslationDict = {
     confirmPassword:   'אימות סיסמה חדשה',
     changePasswordBtn: 'עדכן סיסמה',
     saving:            'שומר…',
+    unbettedOne:       'משחק קרוב ללא הימור',
+    unbettedMany:      'משחקים קרובים ללא הימור',
+    nextKicksOff:      'המשחק הבא מתחיל בעוד',
   },
   matches: {
     title:       'משחקים',
