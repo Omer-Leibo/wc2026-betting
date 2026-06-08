@@ -47,6 +47,68 @@ router.get('/group/:group', authenticate, async (req: AuthRequest, res: Response
   res.json({ matches });
 });
 
+// ─── GET /api/matches/standings ──────────────────────────────────────────────
+// Computes group-stage standings from all GROUP matches that have a score.
+// Includes every team (even 0-played) so the table is always complete.
+
+router.get('/standings', authenticate, async (_req: AuthRequest, res: Response): Promise<void> => {
+  const teamSel = { id: true, name: true, code: true, group: true, flagUrl: true };
+
+  const [scoredMatches, allTeams] = await Promise.all([
+    prisma.match.findMany({
+      where: { stage: 'GROUP', homeScore: { not: null }, awayScore: { not: null } },
+      include: { homeTeam: { select: teamSel }, awayTeam: { select: teamSel } },
+    }),
+    prisma.team.findMany({ select: teamSel, orderBy: { name: 'asc' } }),
+  ]);
+
+  interface Row {
+    team: typeof allTeams[0];
+    played: number; won: number; drawn: number; lost: number;
+    gf: number; ga: number; gd: number; pts: number;
+    live: boolean;
+  }
+
+  const rows = new Map<number, Row>();
+
+  // Seed every team with a blank row
+  for (const team of allTeams) {
+    rows.set(team.id, { team, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, pts: 0, live: false });
+  }
+
+  // Accumulate results
+  for (const m of scoredMatches) {
+    const h = rows.get(m.homeTeam.id)!;
+    const a = rows.get(m.awayTeam.id)!;
+    const hs = m.homeScore!;
+    const as_ = m.awayScore!;
+    const isLive = m.status === 'LIVE';
+
+    h.played++; h.gf += hs; h.ga += as_; h.gd = h.gf - h.ga; if (isLive) h.live = true;
+    a.played++; a.gf += as_; a.ga += hs; a.gd = a.gf - a.ga; if (isLive) a.live = true;
+
+    if (hs > as_)       { h.won++;   h.pts += 3; a.lost++; }
+    else if (hs === as_) { h.drawn++; h.pts += 1; a.drawn++; a.pts += 1; }
+    else                 { h.lost++;  a.won++;    a.pts += 3; }
+  }
+
+  // Group and sort by FIFA tiebreakers: Pts → GD → GF → name
+  const grouped: Record<string, Row[]> = {};
+  for (const row of rows.values()) {
+    const g = row.team.group;
+    if (!grouped[g]) grouped[g] = [];
+    grouped[g].push(row);
+  }
+  for (const g of Object.keys(grouped)) {
+    grouped[g].sort((a, b) =>
+      b.pts - a.pts || b.gd - a.gd || b.gf - a.gf ||
+      a.team.name.localeCompare(b.team.name),
+    );
+  }
+
+  res.json({ standings: grouped });
+});
+
 // ─── GET /api/matches/:id ─────────────────────────────────────────────────────
 
 router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {

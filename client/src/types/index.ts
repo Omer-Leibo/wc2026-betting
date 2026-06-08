@@ -122,6 +122,21 @@ export interface LeaderboardEntry {
   };
 }
 
+// ─── Standings ────────────────────────────────────────────────────────────────
+
+export interface TeamStanding {
+  team: Team;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  gf: number;
+  ga: number;
+  gd: number;
+  pts: number;
+  live: boolean; // true if this team has a currently-live match counted in these stats
+}
+
 // ─── API responses ────────────────────────────────────────────────────────────
 
 export interface ApiError {
