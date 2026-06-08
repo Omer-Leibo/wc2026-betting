@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import { rateLimit } from 'express-rate-limit';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -7,7 +9,10 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
+// ─── Security headers ─────────────────────────────────────────────────────────
+app.use(helmet());
+
+// ─── CORS ─────────────────────────────────────────────────────────────────────
 // CLIENT_URL can be a comma-separated list of allowed origins, e.g.:
 //   https://wc2026-betting-one.vercel.app,https://preview-xyz.vercel.app
 // In development (no CLIENT_URL set) all origins are allowed.
@@ -28,7 +33,30 @@ app.use(cors({
     : (_origin: string | undefined, cb: (e: Error | null, ok?: boolean) => void) => cb(null, true),
   credentials: true,
 }));
-app.use(express.json());
+
+// Body parser — cap at 20 KB to block oversized-payload floods
+app.use(express.json({ limit: '20kb' }));
+
+// ─── Rate limiting ────────────────────────────────────────────────────────────
+
+// General limiter: 150 requests per 15 minutes per IP for all routes
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 150,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { message: 'Too many requests, please try again later.' },
+});
+app.use(generalLimiter);
+
+// Auth limiter: 10 requests per 15 minutes per IP (brute-force protection)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: { message: 'Too many login attempts, please try again in 15 minutes.' },
+});
 
 // Health check
 app.get('/health', (_req, res) => {
@@ -37,6 +65,8 @@ app.get('/health', (_req, res) => {
 
 // Routes
 import authRouter from './routes/auth';
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
 app.use('/api/auth', authRouter);
 import matchesRouter from './routes/matches';
 app.use('/api/matches', matchesRouter);
