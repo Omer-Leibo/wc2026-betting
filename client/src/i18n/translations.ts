@@ -9,6 +9,7 @@ const en = {
   nav: {
     dashboard:   '🏠 Dashboard',
     matches:     '📅 Matches',
+    standings:   '📊 Standings',
     specialBets: '⭐ Special Bets',
     allBets:     '👥 All Bets',
     leaderboard: '🏆 Leaderboard',
@@ -237,6 +238,22 @@ const en = {
     pt:               'pt',
     pts:              'pts',
   },
+  // ── Standings ────────────────────────────────────────────────────────────────
+  standings: {
+    title:       'Group Standings',
+    group:       'Group',
+    played:      'P',
+    won:         'W',
+    drawn:       'D',
+    lost:        'L',
+    gd:          'GD',
+    pts:         'Pts',
+    liveGroup:   'Live',
+    noData:      'No matches played yet — standings will appear once results are in.',
+    advancesNote:'Top 2 advance · Best 8 third-place teams also qualify',
+    qualifies:   'Qualifies',
+    mayQualify:  'May qualify',
+  },
   // ── Common ────────────────────────────────────────────────────────────────────
   common: {
     loading:  'Loading…',
@@ -263,6 +280,7 @@ const he: TranslationDict = {
   nav: {
     dashboard:   '🏠 דשבורד',
     matches:     '📅 משחקים',
+    standings:   '📊 טבלאות',
     specialBets: '⭐ הימורים מיוחדים',
     allBets:     '👥 כל ההימורים',
     leaderboard: '🏆 טבלת דירוג',
@@ -482,6 +500,21 @@ const he: TranslationDict = {
     below:            'מתחת ל-',
     pt:               "נק'",
     pts:              "נק'",
+  },
+  standings: {
+    title:       'טבלות הקבוצות',
+    group:       'קבוצה',
+    played:      'מ',
+    won:         'נ',
+    drawn:       'ת',
+    lost:        'ה',
+    gd:          '+/-',
+    pts:         "נק'",
+    liveGroup:   'חי',
+    noData:      'טרם נערכו משחקים — הטבלאות יופיעו עם הזנת תוצאות.',
+    advancesNote:'2 הראשונים עולים · 8 הטובים מבין השלישיים גם מתקדמים',
+    qualifies:   'מתקדם',
+    mayQualify:  'עשוי להתקדם',
   },
   common: {
     loading:  'טוען...',

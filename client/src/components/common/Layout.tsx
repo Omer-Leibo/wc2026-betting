@@ -44,6 +44,7 @@ export default function Layout() {
   const links = [
     { to: '/',             label: t.nav.dashboard,   end: true  },
     { to: '/matches',      label: t.nav.matches,      end: false },
+    { to: '/standings',    label: t.nav.standings,    end: false },
     { to: '/special-bets', label: t.nav.specialBets,  end: false },
     { to: '/all-bets',     label: t.nav.allBets,      end: false },
     { to: '/leaderboard',  label: t.nav.leaderboard,  end: false },
@@ -54,13 +55,14 @@ export default function Layout() {
   ];
 
   const LINK_COLORS = [
-    'from-red-500 to-red-700',
-    'from-blue-500 to-primary-700',
-    'from-gold-500 to-gold-700',
-    'from-green-500 to-green-700',
-    'from-gold-400 to-yellow-600',
-    'from-gray-400 to-gray-600',
-    'from-primary-400 to-primary-600',
+    'from-red-500 to-red-700',       // Dashboard
+    'from-blue-500 to-primary-700',  // Matches
+    'from-cyan-500 to-blue-700',     // Standings
+    'from-gold-500 to-gold-700',     // Special Bets
+    'from-green-500 to-green-700',   // All Bets
+    'from-gold-400 to-yellow-600',   // Leaderboard
+    'from-gray-400 to-gray-600',     // Rules
+    'from-primary-400 to-primary-600', // Admin
   ];
 
   return (
