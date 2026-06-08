@@ -69,7 +69,7 @@ export default function DashboardPage() {
     return () => clearInterval(timer);
   }, []);
 
-  const { unbettedCount, nextUnbettedMatch } = useBetAlertStore();
+  const { unbettedCount, nextUnbettedMatch, totalMatchCount } = useBetAlertStore();
   const updateBetAlert = useBetAlertStore(s => s.update);
 
   // Change password modal
@@ -200,6 +200,35 @@ export default function DashboardPage() {
         <StatCard label={t.dashboard.exactScores} value={myEntry?.exactScores ?? 0} sub={t.dashboard.allTime} variant="green" />
         <StatCard label={t.dashboard.correctResults} value={myEntry?.correctScores ?? 0} sub={t.dashboard.allTime} variant="red" />
       </div>
+
+      {/* ── Bet completion progress bar ──────────────────────────────────── */}
+      {totalMatchCount > 0 && (() => {
+        const betCount  = matchBets.length;
+        const pct       = Math.round((betCount / totalMatchCount) * 100);
+        const allDone   = betCount >= totalMatchCount;
+        return (
+          <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-gray-400">Bet Coverage</p>
+              <p className="text-xs font-bold" style={{ color: allDone ? '#7ada7c' : '#7a9fff' }}>
+                {betCount} / {totalMatchCount} matches
+                {allDone && <span className="ml-1.5">🎉</span>}
+              </p>
+            </div>
+            <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.08)' }}>
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{
+                  width: `${pct}%`,
+                  background: allDone
+                    ? 'linear-gradient(90deg, #3CAC3B, #7ada7c)'
+                    : 'linear-gradient(90deg, #2A398D, #7a9fff)',
+                }}
+              />
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Unbet warning card ───────────────────────────────────────────── */}
       {unbettedCount > 0 && (() => {

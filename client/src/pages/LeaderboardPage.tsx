@@ -4,6 +4,7 @@ import { leaderboardService } from '../services/leaderboardService';
 import { useAuthStore } from '../store/authStore';
 import { useLang } from '../i18n/LanguageContext';
 import type { LeaderboardEntry, SpecialBetDetail } from '../types';
+import HeadToHeadModal from '../components/leaderboard/HeadToHeadModal';
 
 const rankEmoji = (rank: number) => {
   if (rank === 1) return '🥇';
@@ -39,6 +40,7 @@ export default function LeaderboardPage() {
   const [tournamentStarted, setTournamentStarted] = useState(true);
   const [loading, setLoading]             = useState(true);
   const [tab, setTab]                     = useState<Tab>('rankings');
+  const [compareUserId, setCompareUserId] = useState<number | null>(null);
 
   const loadData = useCallback(async () => {
     const { entries: e, hasLiveGames: live, tournamentStarted: started } = await leaderboardService.get();
@@ -71,6 +73,12 @@ export default function LeaderboardPage() {
 
   return (
     <div className="max-w-7xl mx-auto space-y-4">
+      {compareUserId !== null && (
+        <HeadToHeadModal
+          opponentId={compareUserId}
+          onClose={() => setCompareUserId(null)}
+        />
+      )}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold">{t.leaderboard.title}</h1>
@@ -132,14 +140,24 @@ export default function LeaderboardPage() {
                       {rankEmoji(entry.rank)}
                     </td>
                     <td className="px-3 py-3">
-                      <span className={`font-semibold ${isMe ? 'text-primary-300' : 'text-white'}`}>
-                        {entry.username}
-                      </span>
-                      {isMe && (
-                        <span className="ml-2 text-xs bg-primary-600 text-white px-1.5 py-0.5 rounded-full">
-                          {t.leaderboard.you}
+                      <div className="flex items-center gap-2">
+                        <span className={`font-semibold ${isMe ? 'text-primary-300' : 'text-white'}`}>
+                          {entry.username}
                         </span>
-                      )}
+                        {isMe ? (
+                          <span className="text-xs bg-primary-600 text-white px-1.5 py-0.5 rounded-full">
+                            {t.leaderboard.you}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => setCompareUserId(entry.userId)}
+                            title={`Compare with ${entry.username}`}
+                            className="text-sm opacity-50 hover:opacity-100 transition-opacity leading-none"
+                          >
+                            ⚔️
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="px-3 py-3 text-center text-green-400 font-medium">{entry.correctScores}</td>
                     <td className="px-3 py-3 text-center text-yellow-400 font-medium">{entry.exactScores}</td>

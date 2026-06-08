@@ -110,6 +110,57 @@ router.get('/all', authenticate, async (_req: AuthRequest, res: Response): Promi
   res.json({ matches: result });
 });
 
+// ─── GET /api/bets/compare/:userId  (head-to-head comparison) ────────────────
+// Returns all closed matches with only my bet + opponent's bet (lightweight).
+
+router.get('/compare/:userId', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
+  const myId     = req.userId!;
+  const theirId  = parseInt(req.params.userId as string);
+
+  if (theirId === myId) {
+    res.status(400).json({ message: 'Cannot compare with yourself' }); return;
+  }
+
+  const cutoff = new Date(Date.now() + 60_000);
+  const teamSel = { id: true, name: true, code: true, group: true, flagUrl: true };
+
+  const [matches, opponent] = await Promise.all([
+    prisma.match.findMany({
+      where: {
+        OR: [{ status: { not: 'UPCOMING' } }, { matchDate: { lte: cutoff } }],
+      },
+      include: {
+        homeTeam: { select: teamSel },
+        awayTeam: { select: teamSel },
+        bets: {
+          where: { userId: { in: [myId, theirId] } },
+          select: { userId: true, predictedHome: true, predictedAway: true, pointsAwarded: true },
+        },
+      },
+      orderBy: { matchDate: 'asc' },
+    }),
+    prisma.user.findUnique({ where: { id: theirId }, select: { id: true, username: true } }),
+  ]);
+
+  if (!opponent) { res.status(404).json({ message: 'User not found' }); return; }
+
+  const result = matches.map(m => ({
+    id: m.id,
+    homeTeam: m.homeTeam,
+    awayTeam: m.awayTeam,
+    stage: m.stage,
+    groupRound: m.groupRound,
+    matchDate: m.matchDate,
+    homeScore: m.homeScore,
+    awayScore: m.awayScore,
+    status: m.status,
+    myBet:    m.bets.find(b => b.userId === myId)    ? { predictedHome: m.bets.find(b => b.userId === myId)!.predictedHome, predictedAway: m.bets.find(b => b.userId === myId)!.predictedAway, pointsAwarded: m.bets.find(b => b.userId === myId)!.pointsAwarded } : null,
+    theirBet: m.bets.find(b => b.userId === theirId) ? { predictedHome: m.bets.find(b => b.userId === theirId)!.predictedHome, predictedAway: m.bets.find(b => b.userId === theirId)!.predictedAway, pointsAwarded: m.bets.find(b => b.userId === theirId)!.pointsAwarded } : null,
+  }));
+
+  res.json({ matches: result, opponent });
+});
+
 // ─── POST /api/bets/match/:matchId  (place or update a match bet) ─────────────
 
 router.post('/match/:matchId', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {

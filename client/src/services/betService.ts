@@ -1,5 +1,5 @@
 import api from './api';
-import type { MatchBet, MatchWithAllBets, SpecialBet, SpecialBetType } from '../types';
+import type { MatchBet, MatchWithAllBets, SpecialBet, SpecialBetType, CompareData } from '../types';
 
 export const betService = {
   async getMyBets(): Promise<{ matchBets: MatchBet[]; specialBets: SpecialBet[] }> {
@@ -29,5 +29,10 @@ export const betService = {
   async getAllBets(): Promise<MatchWithAllBets[]> {
     const { data } = await api.get<{ matches: MatchWithAllBets[] }>('/bets/all');
     return data.matches;
+  },
+
+  async compare(userId: number): Promise<CompareData> {
+    const { data } = await api.get<CompareData>(`/bets/compare/${userId}`);
+    return data;
   },
 };
