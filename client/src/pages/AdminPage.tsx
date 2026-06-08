@@ -25,10 +25,12 @@ export default function AdminPage() {
   const [showOnlyPending, setShowOnlyPending] = useState(false);
 
   // Result entry state
-  const [editingId, setEditingId]   = useState<number | null>(null);
-  const [homeScore, setHomeScore]   = useState('');
-  const [awayScore, setAwayScore]   = useState('');
+  const [editingId, setEditingId]     = useState<number | null>(null);
+  const [homeScore, setHomeScore]     = useState('');
+  const [awayScore, setAwayScore]     = useState('');
   const [savingResult, setSavingResult] = useState(false);
+  const [rescoringMatchId, setRescoringMatchId] = useState<number | null>(null);
+  const [rescoringRound, setRescoringRound]     = useState<0 | 1 | 2 | 3>(0); // 0 = none
 
   // Special results state
   const [specialType, setSpecialType]   = useState<'CHAMPION' | 'TOP_SCORER' | 'TOP_ASSISTS'>('CHAMPION');
@@ -113,6 +115,28 @@ export default function AdminPage() {
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to save result');
     } finally { setSavingResult(false); }
+  };
+
+  // ── Re-score individual match ────────────────────────────────────────────
+  const handleRescoreMatch = async (matchId: number) => {
+    setRescoringMatchId(matchId);
+    try {
+      await adminService.rescoreMatch(matchId);
+      toast.success('Match re-scored!');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to re-score match');
+    } finally { setRescoringMatchId(null); }
+  };
+
+  // ── Re-score group round bonuses ─────────────────────────────────────────
+  const handleRescoreRound = async (round: 1 | 2 | 3) => {
+    setRescoringRound(round);
+    try {
+      await adminService.rescoreGroupRound(round);
+      toast.success(`Round ${round} bonuses re-scored!`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to re-score round');
+    } finally { setRescoringRound(0); }
   };
 
   // ── Special results ──────────────────────────────────────────────────────
@@ -366,15 +390,50 @@ export default function AdminPage() {
                         <span className="text-sm text-gray-400">{match.awayTeam.code}</span>
                       </div>
 
-                      <button onClick={handleEnterResult} disabled={savingResult} className="btn-primary ml-auto">
-                        {savingResult ? 'Saving…' : match.status === 'FINISHED' ? 'Update Result' : 'Confirm Result'}
-                      </button>
+                      <div className="ml-auto flex gap-2">
+                        {match.status === 'FINISHED' && (
+                          <button
+                            onClick={e => { e.stopPropagation(); handleRescoreMatch(match.id); }}
+                            disabled={rescoringMatchId === match.id}
+                            className="btn-secondary text-xs py-2"
+                            title="Re-run scoring for this match without changing the result"
+                          >
+                            {rescoringMatchId === match.id ? '⏳' : '🔁 Re-score'}
+                          </button>
+                        )}
+                        <button onClick={handleEnterResult} disabled={savingResult} className="btn-primary">
+                          {savingResult ? 'Saving…' : match.status === 'FINISHED' ? 'Update Result' : 'Confirm Result'}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── RE-SCORE GROUP ROUND BONUSES ─────────────────────────────────── */}
+      {tab === 'results' && (
+        <div className="card space-y-3 max-w-md">
+          <h2 className="font-semibold text-sm">🔁 Re-score Group Stage Bonuses</h2>
+          <p className="text-xs text-gray-400">
+            Re-calculates the bonus points for a full group stage matchday (all 24 matches must be finished).
+            Use this after changing the scoring system or correcting a result.
+          </p>
+          <div className="flex gap-2">
+            {([1, 2, 3] as const).map(round => (
+              <button
+                key={round}
+                onClick={() => handleRescoreRound(round)}
+                disabled={rescoringRound !== 0}
+                className="btn-secondary flex-1 text-sm"
+              >
+                {rescoringRound === round ? '⏳' : `MD ${round}`}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

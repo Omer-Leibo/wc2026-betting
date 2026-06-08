@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
-import { scoreSpecialBets } from '../services/scoring';
+import { scoreMatch, scoreSpecialBets, scoreGroupRoundBonuses } from '../services/scoring';
 import { syncAllFixtures, syncLiveFixtures, syncPlayers, getLastSync } from '../services/syncService';
 import { fetchQuota } from '../services/footballApi';
 import { runBackup, listBackups, getBackupPath } from '../services/backupService';
@@ -112,6 +112,30 @@ router.get('/matches/:id/bets', async (req: AuthRequest, res: Response): Promise
     orderBy: { createdAt: 'asc' },
   });
   res.json({ bets });
+});
+
+// ─── POST /api/admin/rescore-match/:id ── re-score bets for a finished match ──
+
+router.post('/rescore-match/:id', async (req: AuthRequest, res: Response): Promise<void> => {
+  const matchId = parseInt(req.params.id as string);
+  try {
+    await scoreMatch(matchId);
+    res.json({ message: `Match ${matchId} re-scored successfully` });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(400).json({ message: msg });
+  }
+});
+
+// ─── POST /api/admin/rescore-group-round ── re-score all bonuses for a round ──
+
+const rescoreRoundSchema = z.object({ round: z.number().int().min(1).max(3) });
+
+router.post('/rescore-group-round', async (req: AuthRequest, res: Response): Promise<void> => {
+  const parse = rescoreRoundSchema.safeParse(req.body);
+  if (!parse.success) { res.status(400).json({ message: 'round must be 1, 2, or 3' }); return; }
+  await scoreGroupRoundBonuses(parse.data.round);
+  res.json({ message: `Group stage round ${parse.data.round} bonuses re-scored` });
 });
 
 // ─── POST /api/admin/special-results ── score special bets ───────────────────

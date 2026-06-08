@@ -83,6 +83,14 @@ export const adminService = {
     await api.post('/admin/special-results', { type, winnerTeamId, winnerPlayerName });
   },
 
+  async rescoreMatch(matchId: number): Promise<void> {
+    await api.post(`/admin/rescore-match/${matchId}`);
+  },
+
+  async rescoreGroupRound(round: 1 | 2 | 3): Promise<void> {
+    await api.post('/admin/rescore-group-round', { round });
+  },
+
   async getStats(): Promise<AdminStats> {
     const { data } = await api.get<{ stats: AdminStats }>('/admin/stats');
     return data.stats;

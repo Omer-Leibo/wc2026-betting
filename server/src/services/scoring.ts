@@ -115,7 +115,7 @@ function accuracyLadder(correctCount: number): number {
   return 0;
 }
 
-async function scoreGroupRoundBonuses(groupRound: number): Promise<void> {
+export async function scoreGroupRoundBonuses(groupRound: number): Promise<void> {
   const roundMatches = await prisma.match.findMany({
     where: { stage: 'GROUP', groupRound },
   });
