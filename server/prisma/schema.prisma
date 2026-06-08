@@ -50,10 +50,21 @@ model User {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  matchBets      MatchBet[]
-  specialBets    SpecialBet[]
-  bonusLogs      BonusLog[]
-  rankSnapshots  RankSnapshot[]
+  matchBets         MatchBet[]
+  specialBets       SpecialBet[]
+  bonusLogs         BonusLog[]
+  rankSnapshots     RankSnapshot[]
+  pushSubscriptions PushSubscription[]
+}
+
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
 }
 
 model BonusLog {

@@ -1,5 +1,6 @@
 import { prisma } from '../lib/prisma';
 import { syncLiveFixtures, syncAllFixtures } from './syncService';
+import { sendBetReminders } from './pushService';
 
 const DEFAULT_INTERVAL_MS          = 5 * 60 * 1000;       // 5 min — no live games
 const LIVE_INTERVAL_MS             = 60 * 1000;            // 1 min — during live games
@@ -63,6 +64,9 @@ async function pollTick(): Promise<void> {
   } catch (err) {
     console.error('[Poller] Live sync error:', err);
   }
+
+  // Send push reminders to users who haven't bet on matches starting in ~60 min
+  sendBetReminders().catch(err => console.error('[Poller] Push reminders error:', err));
 
   // Choose next interval based on whether live games are happening right now
   const live = await hasLiveMatches();

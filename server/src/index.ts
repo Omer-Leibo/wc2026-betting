@@ -76,6 +76,12 @@ import leaderboardRouter from './routes/leaderboard';
 app.use('/api/leaderboard', leaderboardRouter);
 import adminRouter from './routes/admin';
 app.use('/api/admin', adminRouter);
+import pushRouter from './routes/push';
+app.use('/api/push', pushRouter);
+
+// Initialise VAPID push before starting (non-fatal if keys are absent)
+import { initWebPush } from './services/pushService';
+initWebPush();
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
