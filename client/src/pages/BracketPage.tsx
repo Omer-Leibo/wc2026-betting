@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import { matchService } from '../services/matchService';
-import type { Match, Stage } from '../types';
+import type { Match } from '../types';
 import { Flag } from '../components/Flag';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
@@ -129,7 +129,7 @@ function MatchCard({ match, top, left, slot, stage }: CardProps) {
     }}>
       {team ? (
         <>
-          <Flag url={team.flagUrl} name={team.name} size="xs" />
+          <Flag url={team.flagUrl} name={team.name} size="sm" />
           <span style={{
             flex: 1,
             fontSize: 11,
@@ -212,7 +212,7 @@ function MatchCard({ match, top, left, slot, stage }: CardProps) {
 }
 
 // ─── SVG Connectors ───────────────────────────────────────────────────────────
-function BracketConnectors({ slotMap }: { slotMap: Record<string, Record<number, Match>> }) {
+function BracketConnectors() {
   const lines: React.ReactElement[] = [];
 
   const stroke = 'rgba(80,110,200,0.30)';
@@ -369,7 +369,7 @@ export default function BracketPage() {
             </div>
 
             {/* SVG connector lines */}
-            <BracketConnectors slotMap={slotMap} />
+            <BracketConnectors />
 
             {/* Main bracket stages (R32 → Final) */}
             {MAIN_STAGES.map(stage => {
@@ -431,7 +431,7 @@ export default function BracketPage() {
                 <div className="flex-1 flex items-center gap-2 min-w-0">
                   {m.homeTeam ? (
                     <>
-                      <Flag url={m.homeTeam.flagUrl} name={m.homeTeam.name} size="xs" />
+                      <Flag url={m.homeTeam.flagUrl} name={m.homeTeam.name} size="sm" />
                       <span className="text-xs text-white truncate">{m.homeTeam.code}</span>
                     </>
                   ) : (
@@ -441,7 +441,7 @@ export default function BracketPage() {
                   {m.awayTeam ? (
                     <>
                       <span className="text-xs text-white truncate">{m.awayTeam.code}</span>
-                      <Flag url={m.awayTeam.flagUrl} name={m.awayTeam.name} size="xs" />
+                      <Flag url={m.awayTeam.flagUrl} name={m.awayTeam.name} size="sm" />
                     </>
                   ) : (
                     <span className="text-xs text-gray-600 italic">TBD</span>
