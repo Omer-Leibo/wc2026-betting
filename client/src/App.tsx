@@ -13,6 +13,7 @@ import SpecialBetsPage from './pages/SpecialBetsPage';
 import AllBetsPage from './pages/AllBetsPage';
 import RulesPage from './pages/RulesPage';
 import StandingsPage from './pages/StandingsPage';
+import BracketPage from './pages/BracketPage';
 
 // Layout
 import Layout from './components/common/Layout';
@@ -58,6 +59,7 @@ function App() {
           <Route path="special-bets" element={<SpecialBetsPage />} />
           <Route path="all-bets" element={<AllBetsPage />} />
           <Route path="leaderboard" element={<LeaderboardPage />} />
+          <Route path="bracket" element={<BracketPage />} />
           <Route path="rules" element={<RulesPage />} />
           <Route
             path="admin"

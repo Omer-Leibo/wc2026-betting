@@ -89,6 +89,20 @@ router.patch('/users/:id/status', async (req: AuthRequest, res: Response): Promi
   res.json({ user });
 });
 
+// ─── PATCH /api/admin/matches/:id/bracket-slot ───────────────────────────────
+
+const bracketSlotSchema = z.object({
+  bracketSlot: z.number().int().min(1).max(16).nullable(),
+});
+
+router.patch('/matches/:id/bracket-slot', async (req: AuthRequest, res: Response): Promise<void> => {
+  const parse = bracketSlotSchema.safeParse(req.body);
+  if (!parse.success) { res.status(400).json({ message: 'bracketSlot must be 1–16 or null' }); return; }
+  const id = parseInt(req.params.id as string);
+  await prisma.match.update({ where: { id }, data: { bracketSlot: parse.data.bracketSlot } });
+  res.json({ message: 'Bracket slot updated' });
+});
+
 // ─── GET /api/admin/matches/pending ── all matches (for result entry) ─────────
 
 router.get('/matches/pending', async (_req: AuthRequest, res: Response): Promise<void> => {

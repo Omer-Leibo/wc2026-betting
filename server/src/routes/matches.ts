@@ -109,6 +109,19 @@ router.get('/standings', authenticate, async (_req: AuthRequest, res: Response):
   res.json({ standings: grouped });
 });
 
+// ─── GET /api/matches/bracket ── all knockout matches for bracket view ────────
+
+router.get('/bracket', authenticate, async (_req: AuthRequest, res: Response): Promise<void> => {
+  const matches = await prisma.match.findMany({
+    where: {
+      stage: { in: ['ROUND_OF_32', 'ROUND_OF_16', 'QUARTER_FINAL', 'SEMI_FINAL', 'THIRD_PLACE', 'FINAL'] },
+    },
+    include: { homeTeam: { select: teamSelect }, awayTeam: { select: teamSelect } },
+    orderBy: [{ stage: 'asc' }, { bracketSlot: 'asc' }, { matchDate: 'asc' }],
+  });
+  res.json({ matches });
+});
+
 // ─── GET /api/matches/:id ─────────────────────────────────────────────────────
 
 router.get('/:id', authenticate, async (req: AuthRequest, res: Response): Promise<void> => {
@@ -126,6 +139,7 @@ const resultSchema = z.object({
   homeScore: z.number().int().min(0),
   awayScore: z.number().int().min(0),
   status: z.enum(['LIVE', 'FINISHED']).optional(),
+  bracketSlot: z.number().int().min(1).max(16).nullable().optional(),
 });
 
 router.patch('/:id/result', authenticate, requireAdmin, async (req: AuthRequest, res: Response): Promise<void> => {
@@ -136,12 +150,17 @@ router.patch('/:id/result', authenticate, requireAdmin, async (req: AuthRequest,
   }
 
   const id = parseInt(req.params.id as string);
-  const { homeScore, awayScore, status } = parse.data;
+  const { homeScore, awayScore, status, bracketSlot } = parse.data;
 
   const finalStatus = status ?? 'FINISHED';
   const match = await prisma.match.update({
     where: { id },
-    data: { homeScore, awayScore, status: finalStatus },
+    data: {
+      homeScore,
+      awayScore,
+      status: finalStatus,
+      ...(bracketSlot !== undefined ? { bracketSlot } : {}),
+    },
     include: { homeTeam: { select: teamSelect }, awayTeam: { select: teamSelect } },
   });
 

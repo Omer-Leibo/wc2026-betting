@@ -113,6 +113,7 @@ model Match {
   venue        String?
   homeScore    Int?        // null until match is finished
   awayScore    Int?
+  bracketSlot  Int?        // 1–16 for R32, 1–8 for R16, etc. — admin-assigned
   status       MatchStatus @default(UPCOMING)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt

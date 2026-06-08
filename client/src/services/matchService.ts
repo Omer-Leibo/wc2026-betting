@@ -41,4 +41,9 @@ export const matchService = {
     const { data } = await api.get<{ standings: Record<string, TeamStanding[]> }>('/matches/standings');
     return data.standings;
   },
+
+  async getBracket(): Promise<Match[]> {
+    const { data } = await api.get<{ matches: Match[] }>('/matches/bracket');
+    return data.matches;
+  },
 };

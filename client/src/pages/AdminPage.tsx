@@ -28,7 +28,9 @@ export default function AdminPage() {
   const [editingId, setEditingId]     = useState<number | null>(null);
   const [homeScore, setHomeScore]     = useState('');
   const [awayScore, setAwayScore]     = useState('');
+  const [bracketSlotInput, setBracketSlotInput] = useState('');
   const [savingResult, setSavingResult] = useState(false);
+  const [savingSlot, setSavingSlot] = useState(false);
   const [rescoringMatchId, setRescoringMatchId] = useState<number | null>(null);
   const [rescoringRound, setRescoringRound]     = useState<0 | 1 | 2 | 3>(0); // 0 = none
 
@@ -114,6 +116,7 @@ export default function AdminPage() {
     setEditingId(match.id);
     setHomeScore(match.homeScore != null ? String(match.homeScore) : '');
     setAwayScore(match.awayScore != null ? String(match.awayScore) : '');
+    setBracketSlotInput(match.bracketSlot != null ? String(match.bracketSlot) : '');
   };
 
   const handleEnterResult = async () => {
@@ -131,6 +134,23 @@ export default function AdminPage() {
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to save result');
     } finally { setSavingResult(false); }
+  };
+
+  // ── Save bracket slot ────────────────────────────────────────────────────
+  const handleSaveBracketSlot = async (matchId: number) => {
+    const parsed = bracketSlotInput.trim() === '' ? null : parseInt(bracketSlotInput);
+    if (parsed !== null && (isNaN(parsed) || parsed < 1 || parsed > 16)) {
+      toast.error('Bracket slot must be 1–16 or empty');
+      return;
+    }
+    setSavingSlot(true);
+    try {
+      await adminService.setBracketSlot(matchId, parsed);
+      setAllMatches(prev => prev.map(m => m.id === matchId ? { ...m, bracketSlot: parsed ?? undefined } : m));
+      toast.success(parsed ? `Slot #${parsed} saved` : 'Slot cleared');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to save slot');
+    } finally { setSavingSlot(false); }
   };
 
   // ── Re-score individual match ────────────────────────────────────────────
@@ -447,6 +467,29 @@ export default function AdminPage() {
                           placeholder="0" />
                         <span className="text-sm text-gray-400">{match.awayTeam.code}</span>
                       </div>
+
+                      {/* Bracket slot — knockout matches only */}
+                      {match.stage !== 'GROUP' && (
+                        <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                          <span className="text-xs text-gray-500 shrink-0">Slot</span>
+                          <input
+                            type="number" min={1} max={16}
+                            value={bracketSlotInput}
+                            onChange={e => setBracketSlotInput(e.target.value)}
+                            placeholder="—"
+                            className="w-14 text-center text-sm bg-gray-800 border border-gray-600 rounded-lg px-1 py-1 focus:outline-none focus:border-purple-500 text-white [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <button
+                            onClick={e => { e.stopPropagation(); handleSaveBracketSlot(match.id); }}
+                            disabled={savingSlot}
+                            className="text-xs px-2 py-1.5 rounded-lg font-semibold transition-colors shrink-0"
+                            style={{ background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.5)', color: '#c4b5fd' }}
+                            title="Save bracket position"
+                          >
+                            {savingSlot ? '…' : '🔱'}
+                          </button>
+                        </div>
+                      )}
 
                       <div className="ml-auto flex gap-2">
                         {match.status === 'FINISHED' && (

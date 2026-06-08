@@ -51,6 +51,7 @@ export interface Match {
   awayTeam: Team;
   stage: Stage;
   groupRound?: number;
+  bracketSlot?: number;
   matchDate: string;
   venue?: string;
   homeScore?: number;

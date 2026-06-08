@@ -48,6 +48,7 @@ export default function Layout() {
     { to: '/special-bets', label: t.nav.specialBets,  end: false },
     { to: '/all-bets',     label: t.nav.allBets,      end: false },
     { to: '/leaderboard',  label: t.nav.leaderboard,  end: false },
+    { to: '/bracket',      label: t.nav.bracket,      end: false },
     { to: '/rules',        label: t.nav.rules,        end: false },
     ...(user?.role === 'ADMIN'
       ? [{ to: '/admin', label: t.nav.admin, end: false }]
@@ -61,6 +62,7 @@ export default function Layout() {
     'from-gold-500 to-gold-700',     // Special Bets
     'from-green-500 to-green-700',   // All Bets
     'from-gold-400 to-yellow-600',   // Leaderboard
+    'from-purple-500 to-indigo-700', // Bracket
     'from-gray-400 to-gray-600',     // Rules
     'from-primary-400 to-primary-600', // Admin
   ];
