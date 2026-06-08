@@ -83,6 +83,22 @@ export const adminService = {
     await api.post('/admin/special-results', { type, winnerTeamId, winnerPlayerName });
   },
 
+  async setBracketSlot(matchId: number, bracketSlot: number | null): Promise<void> {
+    await api.patch(`/admin/matches/${matchId}/bracket-slot`, { bracketSlot });
+  },
+
+  async rescoreMatch(matchId: number): Promise<void> {
+    await api.post(`/admin/rescore-match/${matchId}`);
+  },
+
+  async rescoreGroupRound(round: 1 | 2 | 3): Promise<void> {
+    await api.post('/admin/rescore-group-round', { round });
+  },
+
+  async takeSnapshot(label: string): Promise<void> {
+    await api.post('/admin/take-snapshot', { label });
+  },
+
   async getStats(): Promise<AdminStats> {
     const { data } = await api.get<{ stats: AdminStats }>('/admin/stats');
     return data.stats;

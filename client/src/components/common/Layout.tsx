@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { useAuthStore } from '../../store/authStore';
 import { useBetAlertStore } from '../../store/betAlertStore';
 import { useLang } from '../../i18n/LanguageContext';
+import { usePushNotifications } from '../../hooks/usePushNotifications';
 
 // ── Language toggle button ─────────────────────────────────────────────────────
 function LangToggle() {
@@ -32,6 +34,53 @@ function LangToggle() {
   );
 }
 
+// ── Notification bell ──────────────────────────────────────────────────────────
+function NotificationBell() {
+  const { supported, subscribed, loading, toggle } = usePushNotifications();
+  if (!supported) return null;
+
+  const handleClick = async () => {
+    const wasSubscribed = subscribed;
+    await toggle();
+    if (!wasSubscribed) {
+      if (Notification.permission === 'denied') {
+        toast.error('Notifications blocked — enable them in browser settings.');
+      } else {
+        toast.success('🔔 Bet reminders enabled!');
+      }
+    } else {
+      toast('Notifications turned off', { icon: '🔕' });
+    }
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={loading}
+      title={subscribed ? 'Disable bet reminders' : 'Enable bet reminders (1 h before kickoff)'}
+      className="flex items-center justify-center w-8 h-8 rounded-lg transition-all"
+      style={{
+        background: subscribed ? 'rgba(245,166,35,0.18)' : 'rgba(255,255,255,0.05)',
+        border: `1px solid ${subscribed ? 'rgba(245,166,35,0.5)' : 'rgba(255,255,255,0.1)'}`,
+        color: subscribed ? '#F5A623' : '#6b7280',
+        opacity: loading ? 0.5 : 1,
+      }}
+    >
+      {subscribed ? (
+        /* Bell filled */
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+        </svg>
+      ) : (
+        /* Bell with slash */
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M20 18.69L7.84 6.14 5.27 3.49 4 4.76l2.8 2.8v.01c-.52.99-.8 2.16-.8 3.42V16l-2 2v1h13.73l2 2L21 19.72l-1-1.03zM12 22c1.11 0 2-.89 2-2h-4c0 1.11.89 2 2 2zm6-7.32V11c0-3.08-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68c-.15.03-.29.08-.43.12l5.93 9.88z"/>
+        </svg>
+      )}
+    </button>
+  );
+}
+
 export default function Layout() {
   const { user, logout }  = useAuthStore();
   const navigate           = useNavigate();
@@ -48,6 +97,7 @@ export default function Layout() {
     { to: '/special-bets', label: t.nav.specialBets,  end: false },
     { to: '/all-bets',     label: t.nav.allBets,      end: false },
     { to: '/leaderboard',  label: t.nav.leaderboard,  end: false },
+    { to: '/bracket',      label: t.nav.bracket,      end: false },
     { to: '/rules',        label: t.nav.rules,        end: false },
     ...(user?.role === 'ADMIN'
       ? [{ to: '/admin', label: t.nav.admin, end: false }]
@@ -61,6 +111,7 @@ export default function Layout() {
     'from-gold-500 to-gold-700',     // Special Bets
     'from-green-500 to-green-700',   // All Bets
     'from-gold-400 to-yellow-600',   // Leaderboard
+    'from-purple-500 to-indigo-700', // Bracket
     'from-gray-400 to-gray-600',     // Rules
     'from-primary-400 to-primary-600', // Admin
   ];
@@ -145,6 +196,7 @@ export default function Layout() {
           {/* Right side */}
           <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
             <LangToggle />
+            <NotificationBell />
 
             <span className="hidden md:inline text-sm text-gray-400">
               {user?.username}

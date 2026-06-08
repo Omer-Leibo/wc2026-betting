@@ -25,16 +25,36 @@ export default function AdminPage() {
   const [showOnlyPending, setShowOnlyPending] = useState(false);
 
   // Result entry state
-  const [editingId, setEditingId]   = useState<number | null>(null);
-  const [homeScore, setHomeScore]   = useState('');
-  const [awayScore, setAwayScore]   = useState('');
+  const [editingId, setEditingId]     = useState<number | null>(null);
+  const [homeScore, setHomeScore]     = useState('');
+  const [awayScore, setAwayScore]     = useState('');
+  const [bracketSlotInput, setBracketSlotInput] = useState('');
   const [savingResult, setSavingResult] = useState(false);
+  const [savingSlot, setSavingSlot] = useState(false);
+  const [rescoringMatchId, setRescoringMatchId] = useState<number | null>(null);
+  const [rescoringRound, setRescoringRound]     = useState<0 | 1 | 2 | 3>(0); // 0 = none
 
   // Special results state
   const [specialType, setSpecialType]   = useState<'CHAMPION' | 'TOP_SCORER' | 'TOP_ASSISTS'>('CHAMPION');
   const [specialTeamId, setSpecialTeamId] = useState<number | ''>('');
   const [specialPlayer, setSpecialPlayer] = useState('');
   const [savingSpecial, setSavingSpecial] = useState(false);
+
+  // Snapshot state
+  const [snapshotLabel, setSnapshotLabel] = useState('');
+  const [takingSnapshot, setTakingSnapshot] = useState(false);
+
+  const handleTakeSnapshot = async () => {
+    if (!snapshotLabel.trim()) { toast.error('Enter a label first'); return; }
+    setTakingSnapshot(true);
+    try {
+      await adminService.takeSnapshot(snapshotLabel.trim());
+      toast.success(`Snapshot "${snapshotLabel.trim()}" saved!`);
+      setSnapshotLabel('');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to save snapshot');
+    } finally { setTakingSnapshot(false); }
+  };
 
   // Sync state
   const [syncStatus, setSyncStatus]       = useState<SyncStatus | null>(null);
@@ -96,6 +116,7 @@ export default function AdminPage() {
     setEditingId(match.id);
     setHomeScore(match.homeScore != null ? String(match.homeScore) : '');
     setAwayScore(match.awayScore != null ? String(match.awayScore) : '');
+    setBracketSlotInput(match.bracketSlot != null ? String(match.bracketSlot) : '');
   };
 
   const handleEnterResult = async () => {
@@ -113,6 +134,45 @@ export default function AdminPage() {
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to save result');
     } finally { setSavingResult(false); }
+  };
+
+  // ── Save bracket slot ────────────────────────────────────────────────────
+  const handleSaveBracketSlot = async (matchId: number) => {
+    const parsed = bracketSlotInput.trim() === '' ? null : parseInt(bracketSlotInput);
+    if (parsed !== null && (isNaN(parsed) || parsed < 1 || parsed > 16)) {
+      toast.error('Bracket slot must be 1–16 or empty');
+      return;
+    }
+    setSavingSlot(true);
+    try {
+      await adminService.setBracketSlot(matchId, parsed);
+      setAllMatches(prev => prev.map(m => m.id === matchId ? { ...m, bracketSlot: parsed ?? undefined } : m));
+      toast.success(parsed ? `Slot #${parsed} saved` : 'Slot cleared');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to save slot');
+    } finally { setSavingSlot(false); }
+  };
+
+  // ── Re-score individual match ────────────────────────────────────────────
+  const handleRescoreMatch = async (matchId: number) => {
+    setRescoringMatchId(matchId);
+    try {
+      await adminService.rescoreMatch(matchId);
+      toast.success('Match re-scored!');
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to re-score match');
+    } finally { setRescoringMatchId(null); }
+  };
+
+  // ── Re-score group round bonuses ─────────────────────────────────────────
+  const handleRescoreRound = async (round: 1 | 2 | 3) => {
+    setRescoringRound(round);
+    try {
+      await adminService.rescoreGroupRound(round);
+      toast.success(`Round ${round} bonuses re-scored!`);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || 'Failed to re-score round');
+    } finally { setRescoringRound(0); }
   };
 
   // ── Special results ──────────────────────────────────────────────────────
@@ -274,18 +334,60 @@ export default function AdminPage() {
 
       {/* ── OVERVIEW ─────────────────────────────────────────────────────── */}
       {tab === 'overview' && stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: 'Participants', value: stats.userCount },
-            { label: 'Total Matches', value: stats.matchCount },
-            { label: 'Finished', value: stats.finishedCount },
-            { label: 'Total Bets', value: stats.betCount },
-          ].map(({ label, value }) => (
-            <div key={label} className="card text-center">
-              <p className="text-3xl font-bold text-white">{value}</p>
-              <p className="text-sm text-gray-400 mt-1">{label}</p>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: 'Participants', value: stats.userCount },
+              { label: 'Total Matches', value: stats.matchCount },
+              { label: 'Finished', value: stats.finishedCount },
+              { label: 'Total Bets', value: stats.betCount },
+            ].map(({ label, value }) => (
+              <div key={label} className="card text-center">
+                <p className="text-3xl font-bold text-white">{value}</p>
+                <p className="text-sm text-gray-400 mt-1">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Take Leaderboard Snapshot ─────────────────────────────── */}
+          <div className="card space-y-3 max-w-md">
+            <div>
+              <h2 className="font-semibold">📸 Leaderboard Snapshot</h2>
+              <p className="text-xs text-gray-400 mt-1">
+                Capture the current rankings so players can track their history.
+                Snapshots are taken automatically at end of each group matchday — use this for knockouts (e.g. "R32", "R16", "QF").
+              </p>
             </div>
-          ))}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                className="input flex-1 text-sm"
+                placeholder='Label, e.g. "R32" or "QF"'
+                maxLength={20}
+                value={snapshotLabel}
+                onChange={e => setSnapshotLabel(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleTakeSnapshot()}
+              />
+              <button
+                onClick={handleTakeSnapshot}
+                disabled={takingSnapshot || !snapshotLabel.trim()}
+                className="btn-primary text-sm px-4 shrink-0"
+              >
+                {takingSnapshot ? '⏳' : '📸 Save'}
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {['R32', 'R16', 'QF', 'SF', 'Final'].map(label => (
+                <button
+                  key={label}
+                  onClick={() => setSnapshotLabel(label)}
+                  className="text-xs px-2 py-0.5 rounded-md bg-gray-800 text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -366,15 +468,73 @@ export default function AdminPage() {
                         <span className="text-sm text-gray-400">{match.awayTeam.code}</span>
                       </div>
 
-                      <button onClick={handleEnterResult} disabled={savingResult} className="btn-primary ml-auto">
-                        {savingResult ? 'Saving…' : match.status === 'FINISHED' ? 'Update Result' : 'Confirm Result'}
-                      </button>
+                      {/* Bracket slot — knockout matches only */}
+                      {match.stage !== 'GROUP' && (
+                        <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                          <span className="text-xs text-gray-500 shrink-0">Slot</span>
+                          <input
+                            type="number" min={1} max={16}
+                            value={bracketSlotInput}
+                            onChange={e => setBracketSlotInput(e.target.value)}
+                            placeholder="—"
+                            className="w-14 text-center text-sm bg-gray-800 border border-gray-600 rounded-lg px-1 py-1 focus:outline-none focus:border-purple-500 text-white [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <button
+                            onClick={e => { e.stopPropagation(); handleSaveBracketSlot(match.id); }}
+                            disabled={savingSlot}
+                            className="text-xs px-2 py-1.5 rounded-lg font-semibold transition-colors shrink-0"
+                            style={{ background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.5)', color: '#c4b5fd' }}
+                            title="Save bracket position"
+                          >
+                            {savingSlot ? '…' : '🔱'}
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="ml-auto flex gap-2">
+                        {match.status === 'FINISHED' && (
+                          <button
+                            onClick={e => { e.stopPropagation(); handleRescoreMatch(match.id); }}
+                            disabled={rescoringMatchId === match.id}
+                            className="btn-secondary text-xs py-2"
+                            title="Re-run scoring for this match without changing the result"
+                          >
+                            {rescoringMatchId === match.id ? '⏳' : '🔁 Re-score'}
+                          </button>
+                        )}
+                        <button onClick={handleEnterResult} disabled={savingResult} className="btn-primary">
+                          {savingResult ? 'Saving…' : match.status === 'FINISHED' ? 'Update Result' : 'Confirm Result'}
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── RE-SCORE GROUP ROUND BONUSES ─────────────────────────────────── */}
+      {tab === 'results' && (
+        <div className="card space-y-3 max-w-md">
+          <h2 className="font-semibold text-sm">🔁 Re-score Group Stage Bonuses</h2>
+          <p className="text-xs text-gray-400">
+            Re-calculates the bonus points for a full group stage matchday (all 24 matches must be finished).
+            Use this after changing the scoring system or correcting a result.
+          </p>
+          <div className="flex gap-2">
+            {([1, 2, 3] as const).map(round => (
+              <button
+                key={round}
+                onClick={() => handleRescoreRound(round)}
+                disabled={rescoringRound !== 0}
+                className="btn-secondary flex-1 text-sm"
+              >
+                {rescoringRound === round ? '⏳' : `MD ${round}`}
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

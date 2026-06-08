@@ -50,9 +50,21 @@ model User {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  matchBets   MatchBet[]
-  specialBets SpecialBet[]
-  bonusLogs   BonusLog[]
+  matchBets         MatchBet[]
+  specialBets       SpecialBet[]
+  bonusLogs         BonusLog[]
+  rankSnapshots     RankSnapshot[]
+  pushSubscriptions PushSubscription[]
+}
+
+model PushSubscription {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
 }
 
 model BonusLog {
@@ -60,8 +72,20 @@ model BonusLog {
   userId    Int
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   points    Int
-  reason    String   // e.g. "ACCURACY_R1", "EXACT_LADDER_R2"
+  reason    String   // e.g. "R1_BONUS", "UNIQUE_EXACT_<matchId>"
   createdAt DateTime @default(now())
+}
+
+model RankSnapshot {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label       String   // e.g. "MD 1", "MD 2", "MD 3", "R32", "R16", "QF", "SF", "Final"
+  rank        Int
+  totalPoints Int
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, label])
 }
 
 model Team {
@@ -100,6 +124,7 @@ model Match {
   venue        String?
   homeScore    Int?        // null until match is finished
   awayScore    Int?
+  bracketSlot  Int?        // 1–16 for R32, 1–8 for R16, etc. — admin-assigned
   status       MatchStatus @default(UPCOMING)
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
