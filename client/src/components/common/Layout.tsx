@@ -134,8 +134,12 @@ export default function Layout() {
       >
         <div className="flex items-center justify-between max-w-7xl mx-auto">
 
-          {/* Logo */}
-          <div className={`flex items-center gap-3 shrink-0 ${isRTL ? 'flex-row-reverse' : ''}`}>
+          {/* Logo — click to go home */}
+          <NavLink
+            to="/"
+            end
+            className={`flex items-center gap-3 shrink-0 ${isRTL ? 'flex-row-reverse' : ''}`}
+          >
             <img
               src="/wc2026-official-logo.png"
               alt="FIFA World Cup 2026"
@@ -165,7 +169,7 @@ export default function Layout() {
                 {t.nav.subtitle}
               </span>
             </div>
-          </div>
+          </NavLink>
 
           {/* Desktop links */}
           <div className="hidden md:flex items-center gap-0.5">
