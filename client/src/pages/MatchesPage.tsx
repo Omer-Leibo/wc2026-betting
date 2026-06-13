@@ -32,6 +32,7 @@ export default function MatchesPage() {
   const [loading, setLoading]         = useState(true);
   const [view, setView]               = useState<View>('ALL');
   const [selectedGroup, setSelectedGroup] = useState<string>('A');
+  const [upcomingOnly, setUpcomingOnly] = useState(false);
 
   // Track previous match states to detect score changes for toasts
   const prevStatesRef = useRef<Map<number, PrevMatchState>>(new Map());
@@ -132,13 +133,16 @@ export default function MatchesPage() {
 
   // ── Derived lists ─────────────────────────────────────────────────────────
 
-  const groupMatches    = matches.filter(m => m.stage === 'GROUP' && m.homeTeam.group === selectedGroup);
-  const knockoutMatches = matches.filter(m => m.stage !== 'GROUP').sort(
+  // When "upcoming only" is active, hide finished matches across all views
+  const visibleMatches = upcomingOnly ? matches.filter(m => m.status !== 'FINISHED') : matches;
+
+  const groupMatches    = visibleMatches.filter(m => m.stage === 'GROUP' && m.homeTeam.group === selectedGroup);
+  const knockoutMatches = visibleMatches.filter(m => m.stage !== 'GROUP').sort(
     (a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime()
   );
 
   // All games: sorted by date, grouped into sections
-  const allSorted = [...matches].sort(
+  const allSorted = [...visibleMatches].sort(
     (a, b) => new Date(a.matchDate).getTime() - new Date(b.matchDate).getTime()
   );
 
@@ -172,14 +176,26 @@ export default function MatchesPage() {
         <p className="text-sm text-gray-400">{bets.length} {t.matches.betsPlaced}</p>
       </div>
 
-      {/* View selector */}
-      <div className="flex gap-2 flex-wrap">
+      {/* View selector + upcoming filter */}
+      <div className="flex items-center gap-2 flex-wrap">
         {(['ALL','GROUP','KNOCKOUT'] as View[]).map(v => (
           <button key={v} onClick={() => setView(v)}
             className={`px-4 py-2 rounded-lg font-heading font-bold text-base tracking-wide transition-colors ${view === v ? 'bg-primary-600 text-white' : 'bg-gray-800/80 text-gray-400 hover:text-white'}`}>
             {v === 'ALL' ? t.matches.allGames : v === 'GROUP' ? t.matches.byGroup : t.matches.knockout}
           </button>
         ))}
+
+        {/* Upcoming-only toggle */}
+        <button
+          onClick={() => setUpcomingOnly(o => !o)}
+          className={`ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+            upcomingOnly
+              ? 'bg-amber-500/20 border border-amber-500/60 text-amber-300'
+              : 'bg-gray-800/80 border border-transparent text-gray-400 hover:text-white'
+          }`}
+        >
+          ⏳ Upcoming only
+        </button>
       </div>
 
       {/* ── ALL GAMES ─────────────────────────────────────────────────────── */}

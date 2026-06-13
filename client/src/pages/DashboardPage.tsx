@@ -270,6 +270,50 @@ export default function DashboardPage() {
         <StatCard label={t.dashboard.correctResults} value={myEntry?.correctScores ?? 0} sub={t.dashboard.allTime} variant="red" />
       </div>
 
+      {/* ── Mini leaderboard ─────────────────────────────────────────────── */}
+      {leaderboard.length > 0 && (
+        <div className="card">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xl text-white">🏆 {t.nav.leaderboard.replace(/^\S+\s*/, '')}</h2>
+            <Link to="/leaderboard" className="text-xs text-primary-400 hover:text-primary-300 font-semibold">
+              View all →
+            </Link>
+          </div>
+          <div className="divide-y divide-gray-800">
+            {leaderboard.map(entry => {
+              const isMe = entry.userId === user?.id;
+              return (
+                <div
+                  key={entry.userId}
+                  className={`flex items-center gap-3 py-2 px-2 rounded-lg ${isMe ? 'bg-primary-900/30' : ''}`}
+                >
+                  {/* Rank */}
+                  <span className={`text-xs font-bold w-7 text-right shrink-0 ${
+                    entry.rank === 1 ? 'text-yellow-400' :
+                    entry.rank === 2 ? 'text-gray-300' :
+                    entry.rank === 3 ? 'text-amber-600' :
+                    'text-gray-600'
+                  }`}>
+                    {entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : `#${entry.rank}`}
+                  </span>
+
+                  {/* Username */}
+                  <span className={`flex-1 text-sm font-medium truncate ${isMe ? 'text-primary-300' : 'text-gray-200'}`}>
+                    {entry.username}
+                    {isMe && <span className="ml-1.5 text-[10px] text-primary-400">({t.leaderboard.you})</span>}
+                  </span>
+
+                  {/* Points */}
+                  <span className={`text-sm font-bold shrink-0 tabular-nums ${isMe ? 'text-yellow-400' : 'text-gray-300'}`}>
+                    {entry.totalPoints} <span className="text-xs font-normal text-gray-500">{t.common.pts}</span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ── Rank history chart ───────────────────────────────────────────── */}
       <RankHistoryChart snapshots={rankHistory} />
 

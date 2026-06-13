@@ -212,11 +212,15 @@ export default function AllBetsPage() {
   const groupKeys = [...new Set(matches.filter(m => m.stage === 'GROUP').map(sectionKey))]
     .sort((a, b) => (parseInt(a.replace('GROUP_', '')) || 0) - (parseInt(b.replace('GROUP_', '')) || 0));
   const knockoutKeys = KNOCKOUT_SECTION_ORDER.filter(k => matches.some(m => sectionKey(m) === k));
-  const dynamicOrder = [...groupKeys, ...knockoutKeys];
+  // Reverse so the most-recent stage (and newest games within it) appear first —
+  // live matches naturally rise to the top.
+  const dynamicOrder = [...groupKeys, ...knockoutKeys].reverse();
 
   const sections: { key: string; label: string; matches: MatchWithAllBets[] }[] = [];
   for (const key of dynamicOrder) {
-    const sMatches = matches.filter(m => sectionKey(m) === key);
+    const sMatches = matches
+      .filter(m => sectionKey(m) === key)
+      .sort((a, b) => new Date(b.matchDate).getTime() - new Date(a.matchDate).getTime());
     if (sMatches.length > 0) {
       sections.push({ key, label: getSectionLabel(key), matches: sMatches });
     }
