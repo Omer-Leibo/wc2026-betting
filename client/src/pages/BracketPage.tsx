@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import dayjs from 'dayjs';
 import { matchService } from '../services/matchService';
 import type { Match, Team, TeamStanding } from '../types';
 import { Flag } from '../components/Flag';
