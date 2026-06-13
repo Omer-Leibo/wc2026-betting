@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import dayjs from 'dayjs';
 import { matchService } from '../services/matchService';
-import type { Match } from '../types';
+import type { Match, Team, TeamStanding } from '../types';
 import { Flag } from '../components/Flag';
+import { R32_BRACKET } from '../config/wc2026Bracket';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 const UNIT     = 52;   // px per R32 slot — vertical rhythm
@@ -14,7 +15,7 @@ const TOP_PAD  = 32;   // px — top padding inside the bracket (leaves room for
 
 // Total bracket canvas size
 const BRACKET_W = COL_W * 4 + CARD_W + 16;  // 1032px
-const BRACKET_H = 16 * UNIT + TOP_PAD + CARD_H + 24 + 60; // ~948px (handles 3rd place)
+const BRACKET_H = 16 * UNIT + TOP_PAD + CARD_H + 24 + 60;
 
 // Stage column x-positions (left edge of card)
 const STAGE_X: Record<string, number> = {
@@ -77,6 +78,55 @@ function cardBg(status: string | undefined): string {
   return 'rgba(12,18,52,0.92)';
 }
 
+// ─── Standings helpers ────────────────────────────────────────────────────────
+
+/** True if the team record is a real, known team (not a TBD placeholder) */
+function isRealTeam(team: Team | null | undefined): boolean {
+  if (!team) return false;
+  const code = team.code?.toUpperCase();
+  return code !== 'TBD' && code !== 'TBA' && !!team.flagUrl;
+}
+
+/** Resolve a position string like "1A" or "2B" against current standings.
+ *  Returns the team (if standings exist) and whether the group is fully played. */
+function resolvePos(
+  pos: string,
+  standings: Record<string, TeamStanding[]>,
+): { team: Team | null; confirmed: boolean } {
+  if (pos === '3rd') return { team: null, confirmed: false };
+
+  const rank  = parseInt(pos[0], 10);   // 1 or 2
+  const group = pos[1];                 // A–L
+
+  const rows = standings[group];
+  if (!rows || rows.length === 0) return { team: null, confirmed: false };
+
+  const row = rows[rank - 1];
+  if (!row) return { team: null, confirmed: false };
+
+  // A group is "confirmed" once every team has played all 3 group games
+  const confirmed = rows.every(r => r.played >= 3);
+
+  return { team: row.team, confirmed };
+}
+
+/** Human-readable position label, e.g. "1A" → "1st · Grp A" */
+function posLabel(pos: string): string {
+  if (pos === '3rd') return 'Best 3rd';
+  const rank  = parseInt(pos[0], 10);
+  const group = pos[1];
+  const suffix = rank === 1 ? '1st' : rank === 2 ? '2nd' : `${rank}th`;
+  return `${suffix} · Grp ${group}`;
+}
+
+// ─── Placeholder type ─────────────────────────────────────────────────────────
+
+interface Placeholder {
+  team: Team | null;
+  pos: string;
+  confirmed: boolean;
+}
+
 // ─── MatchCard ────────────────────────────────────────────────────────────────
 interface CardProps {
   match: Match | null;
@@ -84,9 +134,11 @@ interface CardProps {
   left: number;
   slot: number;
   stage: string;
+  homePlaceholder?: Placeholder;
+  awayPlaceholder?: Placeholder;
 }
 
-function MatchCard({ match, top, left, slot, stage }: CardProps) {
+function MatchCard({ match, top, left, slot, stage, homePlaceholder, awayPlaceholder }: CardProps) {
   const isFinished = match?.status === 'FINISHED';
   const isLive     = match?.status === 'LIVE';
   const homeWin = isFinished && (match!.homeScore ?? 0) > (match!.awayScore ?? 0);
@@ -113,52 +165,77 @@ function MatchCard({ match, top, left, slot, stage }: CardProps) {
                     `${STAGE_LABEL[stage]} ${slot}`;
 
   const TeamRow = ({
-    team, score, isWinner,
+    team,
+    score,
+    isWinner,
+    placeholder,
   }: {
     team?: Match['homeTeam'];
     score?: number;
     isWinner: boolean;
-  }) => (
-    <div style={{
-      flex: 1,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 5,
-      paddingInline: 8,
-      background: isWinner ? 'rgba(255,255,255,0.04)' : 'transparent',
-    }}>
-      {team ? (
-        <>
-          <Flag url={team.flagUrl} name={team.name} size="sm" />
-          <span style={{
-            flex: 1,
-            fontSize: 11,
-            fontWeight: isWinner ? 700 : 400,
-            color: isWinner ? '#fff' : isFinished ? '#6b7280' : '#d1d5db',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            letterSpacing: '0.02em',
-          }}>
-            {team.code}
-          </span>
-          {(isFinished || isLive) && score !== undefined && (
-            <span style={{
-              fontSize: 13,
-              fontWeight: 700,
-              color: isWinner ? '#86efac' : isLive ? '#f87171' : '#9ca3af',
-              minWidth: 16,
-              textAlign: 'right',
-            }}>
-              {score}
+    placeholder?: Placeholder;
+  }) => {
+    const real = isRealTeam(team) ? team : null;
+    // Use real DB team first; fall back to standings-resolved team; fall back to label
+    const displayTeam = real ?? placeholder?.team ?? null;
+    // Tentative = we have a team from standings but their group isn't complete yet
+    const isTentative = !real && !!placeholder?.team && !placeholder.confirmed;
+    const isScorable  = isFinished || isLive;
+
+    return (
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 5,
+        paddingInline: 8,
+        background: isWinner ? 'rgba(255,255,255,0.04)' : 'transparent',
+      }}>
+        {displayTeam ? (
+          <>
+            <span style={{ opacity: isTentative ? 0.65 : 1, display: 'flex', alignItems: 'center' }}>
+              <Flag url={displayTeam.flagUrl} name={displayTeam.name} size="sm" />
             </span>
-          )}
-        </>
-      ) : (
-        <span style={{ fontSize: 11, color: '#374151', fontStyle: 'italic' }}>TBD</span>
-      )}
-    </div>
-  );
+            <span style={{
+              flex: 1,
+              fontSize: 11,
+              fontWeight: isWinner ? 700 : 400,
+              color: isWinner ? '#fff' : isScorable ? '#6b7280' : '#d1d5db',
+              opacity: isTentative ? 0.65 : 1,
+              fontStyle: isTentative ? 'italic' : 'normal',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              letterSpacing: '0.02em',
+            }}>
+              {displayTeam.code}
+            </span>
+            {isTentative && (
+              <span style={{ fontSize: 8, color: '#6b7280', flexShrink: 0 }} title="Group not complete">~</span>
+            )}
+            {isScorable && score !== undefined && (
+              <span style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: isWinner ? '#86efac' : isLive ? '#f87171' : '#9ca3af',
+                minWidth: 16,
+                textAlign: 'right',
+              }}>
+                {score}
+              </span>
+            )}
+          </>
+        ) : placeholder ? (
+          // Position label — group hasn't played yet
+          <span style={{ fontSize: 10, color: '#4b5563', fontStyle: 'italic', whiteSpace: 'nowrap' }}>
+            {posLabel(placeholder.pos)}
+          </span>
+        ) : (
+          <span style={{ fontSize: 11, color: '#374151', fontStyle: 'italic' }}>TBD</span>
+        )}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -181,15 +258,17 @@ function MatchCard({ match, top, left, slot, stage }: CardProps) {
       <div style={style}>
         <TeamRow
           team={match?.homeTeam}
-          score={match?.homeScore}
+          score={match?.homeScore ?? undefined}
           isWinner={homeWin}
+          placeholder={homePlaceholder}
         />
         {/* Divider */}
         <div style={{ height: 1, background: 'rgba(255,255,255,0.05)', flexShrink: 0 }} />
         <TeamRow
           team={match?.awayTeam}
-          score={match?.awayScore}
+          score={match?.awayScore ?? undefined}
           isWinner={awayWin}
+          placeholder={awayPlaceholder}
         />
       </div>
 
@@ -259,18 +338,37 @@ function BracketConnectors() {
   );
 }
 
+// ─── Later-stage stages (R16 → Final) ────────────────────────────────────────
+const LATER_STAGES = ['ROUND_OF_16', 'QUARTER_FINAL', 'SEMI_FINAL', 'FINAL'] as const;
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function BracketPage() {
-  const [matches, setMatches]   = useState<Match[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const [matches,   setMatches]   = useState<Match[]>([]);
+  const [standings, setStandings] = useState<Record<string, TeamStanding[]>>({});
+  const [loading,   setLoading]   = useState(true);
 
-  useEffect(() => {
-    matchService.getBracket()
-      .then(setMatches)
-      .finally(() => setLoading(false));
+  const loadData = useCallback(async () => {
+    const [m, s] = await Promise.all([
+      matchService.getBracket(),
+      matchService.getStandings(),
+    ]);
+    setMatches(m);
+    setStandings(s);
   }, []);
 
-  // Build lookup: stage → slot → match
+  useEffect(() => {
+    loadData().finally(() => setLoading(false));
+  }, [loadData]);
+
+  // Poll every 60 s while any knockout or group match is live
+  const hasLive = matches.some(m => m.status === 'LIVE');
+  useEffect(() => {
+    if (!hasLive) return;
+    const timer = setInterval(() => loadData().catch(() => {}), 60_000);
+    return () => clearInterval(timer);
+  }, [hasLive, loadData]);
+
+  // Build lookup: stage → slot → match (only for matches WITH a bracketSlot)
   const slotMap = useMemo(() => {
     const map: Record<string, Record<number, Match>> = {};
     for (const m of matches) {
@@ -280,15 +378,6 @@ export default function BracketPage() {
     }
     return map;
   }, [matches]);
-
-  // Matches without a bracketSlot assigned
-  const unslotted = matches.filter(m => m.bracketSlot == null);
-
-  // Count how many slots across main stages have been filled
-  const MAIN_STAGES = ['ROUND_OF_32', 'ROUND_OF_16', 'QUARTER_FINAL', 'SEMI_FINAL', 'FINAL'] as const;
-  const totalFilled = MAIN_STAGES.reduce((acc, s) =>
-    acc + Object.keys(slotMap[s] ?? {}).length, 0);
-  const hasAnySlots = totalFilled > 0;
 
   if (loading) {
     return (
@@ -308,155 +397,199 @@ export default function BracketPage() {
             World Cup 2026 · R32 → R16 → QF → SF → Final
           </p>
         </div>
-        {hasAnySlots && (
-          <span className="text-xs text-gray-500 bg-gray-800 px-3 py-1 rounded-full">
-            {totalFilled} / {31} matches positioned
+        {hasLive && (
+          <span className="flex items-center gap-1.5 text-xs bg-green-900/40 border border-green-700 text-green-400 px-2.5 py-1 rounded-full font-medium">
+            <span className="animate-pulse">🔴</span> Live
           </span>
         )}
       </div>
 
-      {!hasAnySlots ? (
-        /* ── Not yet set up ─────────────────────────────────────────────── */
-        <div className="card py-16 text-center space-y-3 max-w-md mx-auto">
-          <p className="text-4xl">🔱</p>
-          <p className="text-gray-400 font-medium">Bracket not yet available</p>
-          <p className="text-gray-600 text-sm">
-            The knockout stage bracket will appear here once the admin assigns bracket slots to
-            the Round of 32 matches.
-          </p>
-        </div>
-      ) : (
-        /* ── Bracket canvas ─────────────────────────────────────────────── */
-        <div style={{ overflowX: 'auto', overflowY: 'visible', paddingBottom: 8 }}>
-          <div style={{
-            position: 'relative',
-            width:  BRACKET_W,
-            height: BRACKET_H,
-            minWidth: BRACKET_W,
-          }}>
+      {/* Legend */}
+      <div className="flex items-center gap-4 text-xs text-gray-500">
+        <span className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-white/70 inline-block" /> Confirmed
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-white/30 inline-block" /><em>~</em>&nbsp;Tentative (group in progress)
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-gray-700 inline-block" /> Position TBD
+        </span>
+      </div>
 
-            {/* Stage column headers */}
-            {MAIN_STAGES.map(stage => (
-              <div key={stage} style={{
-                position: 'absolute',
-                top: 4,
-                left: STAGE_X[stage],
-                width: CARD_W,
-                textAlign: 'center',
-                fontSize: 11,
-                fontWeight: 700,
-                letterSpacing: '0.12em',
-                color: 'rgba(148,163,216,0.7)',
-                textTransform: 'uppercase',
-              }}>
-                {STAGE_LABEL[stage]}
-              </div>
-            ))}
-            {/* 3rd Place header */}
-            <div style={{
+      {/* ── Bracket canvas ────────────────────────────────────────────────── */}
+      <div style={{ overflowX: 'auto', overflowY: 'visible', paddingBottom: 8 }}>
+        <div style={{
+          position: 'relative',
+          width:  BRACKET_W,
+          height: BRACKET_H,
+          minWidth: BRACKET_W,
+        }}>
+
+          {/* Stage column headers */}
+          {(['ROUND_OF_32', ...LATER_STAGES] as const).map(stage => (
+            <div key={stage} style={{
               position: 'absolute',
-              top: slotCenterY('THIRD_PLACE', 1) - CARD_H / 2 - 13,
-              left: STAGE_X.THIRD_PLACE,
+              top: 4,
+              left: STAGE_X[stage],
               width: CARD_W,
               textAlign: 'center',
-              fontSize: 9,
+              fontSize: 11,
               fontWeight: 700,
               letterSpacing: '0.12em',
-              color: 'rgba(148,163,216,0.4)',
+              color: 'rgba(148,163,216,0.7)',
               textTransform: 'uppercase',
             }}>
-              3rd Place
+              {STAGE_LABEL[stage]}
             </div>
+          ))}
+          {/* 3rd Place header */}
+          <div style={{
+            position: 'absolute',
+            top: slotCenterY('THIRD_PLACE', 1) - CARD_H / 2 - 13,
+            left: STAGE_X.THIRD_PLACE,
+            width: CARD_W,
+            textAlign: 'center',
+            fontSize: 9,
+            fontWeight: 700,
+            letterSpacing: '0.12em',
+            color: 'rgba(148,163,216,0.4)',
+            textTransform: 'uppercase',
+          }}>
+            3rd Place
+          </div>
 
-            {/* SVG connector lines */}
-            <BracketConnectors />
+          {/* SVG connector lines */}
+          <BracketConnectors />
 
-            {/* Main bracket stages (R32 → Final) */}
-            {MAIN_STAGES.map(stage => {
-              const slots = STAGE_SLOTS[stage];
-              return Array.from({ length: slots }, (_, i) => i + 1).map(slot => {
-                const match = slotMap[stage]?.[slot] ?? null;
-                const cy    = slotCenterY(stage, slot);
-                return (
-                  <MatchCard
-                    key={`${stage}-${slot}`}
-                    match={match}
-                    top={cy - CARD_H / 2}
-                    left={STAGE_X[stage]}
-                    slot={slot}
-                    stage={stage}
-                  />
-                );
-              });
-            })}
+          {/* ── R32 — always render all 16 slots using config + standings ── */}
+          {R32_BRACKET.map(({ slot, homePos, awayPos }) => {
+            const match = slotMap['ROUND_OF_32']?.[slot] ?? null;
+            const homeResolved = resolvePos(homePos, standings);
+            const awayResolved = resolvePos(awayPos, standings);
+            const cy = slotCenterY('ROUND_OF_32', slot);
 
-            {/* 3rd Place */}
-            {(() => {
-              const match = slotMap['THIRD_PLACE']?.[1] ?? null;
-              const cy = slotCenterY('THIRD_PLACE', 1);
+            return (
+              <MatchCard
+                key={`ROUND_OF_32-${slot}`}
+                match={match}
+                top={cy - CARD_H / 2}
+                left={STAGE_X['ROUND_OF_32']}
+                slot={slot}
+                stage="ROUND_OF_32"
+                homePlaceholder={{ team: homeResolved.team, pos: homePos, confirmed: homeResolved.confirmed }}
+                awayPlaceholder={{ team: awayResolved.team, pos: awayPos, confirmed: awayResolved.confirmed }}
+              />
+            );
+          })}
+
+          {/* ── R16 → Final — show admin-assigned slots ────────────────── */}
+          {LATER_STAGES.map(stage => {
+            const slots = STAGE_SLOTS[stage];
+            return Array.from({ length: slots }, (_, i) => i + 1).map(slot => {
+              const match = slotMap[stage]?.[slot] ?? null;
+              const cy    = slotCenterY(stage, slot);
               return (
                 <MatchCard
-                  key="THIRD_PLACE-1"
+                  key={`${stage}-${slot}`}
                   match={match}
                   top={cy - CARD_H / 2}
-                  left={STAGE_X.THIRD_PLACE}
-                  slot={1}
-                  stage="THIRD_PLACE"
+                  left={STAGE_X[stage]}
+                  slot={slot}
+                  stage={stage}
                 />
               );
-            })()}
-          </div>
+            });
+          })}
+
+          {/* 3rd Place */}
+          {(() => {
+            const match = slotMap['THIRD_PLACE']?.[1] ?? null;
+            const cy = slotCenterY('THIRD_PLACE', 1);
+            return (
+              <MatchCard
+                key="THIRD_PLACE-1"
+                match={match}
+                top={cy - CARD_H / 2}
+                left={STAGE_X.THIRD_PLACE}
+                slot={1}
+                stage="THIRD_PLACE"
+              />
+            );
+          })()}
         </div>
-      )}
+      </div>
 
-      {/* ── Unslotted matches (visible to all, useful to know what's coming) */}
-      {unslotted.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-widest">
-            Upcoming Knockout Matches
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-2xl">
-            {unslotted.map(m => (
+      {/* ── R32 quick-reference table (compact, useful on mobile too) ─────── */}
+      <div className="space-y-2 pt-2">
+        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-widest">
+          Round of 32 — Matchups
+        </h2>
+        <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-4">
+          {R32_BRACKET.map(({ slot, homePos, awayPos }) => {
+            const match = slotMap['ROUND_OF_32']?.[slot] ?? null;
+            const homeRes = resolvePos(homePos, standings);
+            const awayRes = resolvePos(awayPos, standings);
+
+            const homeTeam = isRealTeam(match?.homeTeam) ? match!.homeTeam : homeRes.team;
+            const awayTeam = isRealTeam(match?.awayTeam) ? match!.awayTeam : awayRes.team;
+
+            const homeName = homeTeam?.name ?? posLabel(homePos);
+            const awayName = awayTeam?.name ?? posLabel(awayPos);
+            const homeTentative = !isRealTeam(match?.homeTeam) && !!homeRes.team && !homeRes.confirmed;
+            const awayTentative = !isRealTeam(match?.awayTeam) && !!awayRes.team && !awayRes.confirmed;
+
+            const isLiveMatch    = match?.status === 'LIVE';
+            const isFinishedMatch = match?.status === 'FINISHED';
+
+            return (
               <div
-                key={m.id}
-                className="card flex items-center gap-3 py-2.5 px-3"
-                style={{ border: '1px solid rgba(255,255,255,0.06)' }}
+                key={slot}
+                className="card flex items-center gap-2 py-2 px-3 text-xs"
+                style={{
+                  border: isLiveMatch ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(255,255,255,0.06)',
+                  background: isLiveMatch ? 'rgba(239,68,68,0.05)' : undefined,
+                }}
               >
-                {/* Stage badge */}
-                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-600 shrink-0 w-12 text-center">
-                  {STAGE_LABEL[m.stage] ?? m.stage}
-                </span>
+                {/* Slot number */}
+                <span className="text-gray-600 font-mono w-5 shrink-0">{slot}</span>
 
-                {/* Teams / TBD */}
-                <div className="flex-1 flex items-center gap-2 min-w-0">
-                  {m.homeTeam ? (
-                    <>
-                      <Flag url={m.homeTeam.flagUrl} name={m.homeTeam.name} size="sm" />
-                      <span className="text-xs text-white truncate">{m.homeTeam.code}</span>
-                    </>
-                  ) : (
-                    <span className="text-xs text-gray-600 italic">TBD</span>
-                  )}
-                  <span className="text-gray-700 text-xs">vs</span>
-                  {m.awayTeam ? (
-                    <>
-                      <span className="text-xs text-white truncate">{m.awayTeam.code}</span>
-                      <Flag url={m.awayTeam.flagUrl} name={m.awayTeam.name} size="sm" />
-                    </>
-                  ) : (
-                    <span className="text-xs text-gray-600 italic">TBD</span>
-                  )}
+                {/* Home */}
+                <div className="flex items-center gap-1 flex-1 min-w-0 justify-end">
+                  {homeTeam && <Flag url={homeTeam.flagUrl} name={homeTeam.name} size="sm" />}
+                  <span className={`truncate font-medium ${isFinishedMatch && (match!.homeScore ?? 0) > (match!.awayScore ?? 0) ? 'text-white' : 'text-gray-300'} ${homeTentative ? 'opacity-60 italic' : ''}`}>
+                    {homeName}
+                  </span>
+                  {isFinishedMatch || isLiveMatch ? (
+                    <span className="font-bold tabular-nums text-white ml-1">{match!.homeScore}</span>
+                  ) : null}
                 </div>
 
-                {/* Date */}
-                <span className="text-xs text-gray-600 shrink-0">
-                  {dayjs(m.matchDate).format('D MMM')}
-                </span>
+                <span className="text-gray-700 shrink-0">–</span>
+
+                {/* Away */}
+                <div className="flex items-center gap-1 flex-1 min-w-0">
+                  {isFinishedMatch || isLiveMatch ? (
+                    <span className="font-bold tabular-nums text-white mr-1">{match!.awayScore}</span>
+                  ) : null}
+                  <span className={`truncate font-medium ${isFinishedMatch && (match!.awayScore ?? 0) > (match!.homeScore ?? 0) ? 'text-white' : 'text-gray-300'} ${awayTentative ? 'opacity-60 italic' : ''}`}>
+                    {awayName}
+                  </span>
+                  {awayTeam && <Flag url={awayTeam.flagUrl} name={awayTeam.name} size="sm" />}
+                </div>
+
+                {/* Status badge */}
+                {isLiveMatch && (
+                  <span className="text-red-400 animate-pulse shrink-0">🔴</span>
+                )}
+                {isFinishedMatch && (
+                  <span className="text-gray-600 shrink-0 text-[10px]">FT</span>
+                )}
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
-      )}
+      </div>
     </div>
   );
 }
