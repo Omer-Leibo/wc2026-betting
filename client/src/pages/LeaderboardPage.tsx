@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/authStore';
 import { useLang } from '../i18n/LanguageContext';
 import type { LeaderboardEntry, SpecialBetDetail } from '../types';
 import HeadToHeadModal from '../components/leaderboard/HeadToHeadModal';
+import UserBreakdownModal from '../components/leaderboard/UserBreakdownModal';
 
 const rankEmoji = (rank: number) => {
   if (rank === 1) return '🥇';
@@ -40,7 +41,8 @@ export default function LeaderboardPage() {
   const [tournamentStarted, setTournamentStarted] = useState(true);
   const [loading, setLoading]             = useState(true);
   const [tab, setTab]                     = useState<Tab>('rankings');
-  const [compareUserId, setCompareUserId] = useState<number | null>(null);
+  const [compareUserId,   setCompareUserId]   = useState<number | null>(null);
+  const [breakdownUser,   setBreakdownUser]   = useState<{ id: number; username: string } | null>(null);
 
   const loadData = useCallback(async () => {
     const { entries: e, hasLiveGames: live, tournamentStarted: started } = await leaderboardService.get();
@@ -79,6 +81,13 @@ export default function LeaderboardPage() {
           onClose={() => setCompareUserId(null)}
         />
       )}
+      {breakdownUser !== null && (
+        <UserBreakdownModal
+          userId={breakdownUser.id}
+          username={breakdownUser.username}
+          onClose={() => setBreakdownUser(null)}
+        />
+      )}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold">{t.leaderboard.title}</h1>
@@ -112,6 +121,7 @@ export default function LeaderboardPage() {
       ) : tab === 'rankings' ? (
         /* ── Rankings table ─────────────────────────────────────────────── */
         <div className="overflow-x-auto rounded-xl border border-gray-800">
+          <p className="text-[10px] text-gray-600 px-3 pt-2">Click any row to see full breakdown</p>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-800 bg-gray-900">
@@ -132,8 +142,9 @@ export default function LeaderboardPage() {
                 return (
                   <tr
                     key={entry.userId}
-                    className={`border-b border-gray-800 last:border-0 transition-colors ${
-                      isMe ? 'bg-primary-950/40' : 'hover:bg-gray-800/40'
+                    onClick={() => setBreakdownUser({ id: entry.userId, username: entry.username })}
+                    className={`border-b border-gray-800 last:border-0 transition-colors cursor-pointer ${
+                      isMe ? 'bg-primary-950/40 hover:bg-primary-950/60' : 'hover:bg-gray-800/40'
                     }`}
                   >
                     <td className="px-3 py-3 text-center font-bold text-base">
@@ -150,7 +161,7 @@ export default function LeaderboardPage() {
                           </span>
                         ) : (
                           <button
-                            onClick={() => setCompareUserId(entry.userId)}
+                            onClick={(e) => { e.stopPropagation(); setCompareUserId(entry.userId); }}
                             title={`Compare with ${entry.username}`}
                             className="text-sm opacity-50 hover:opacity-100 transition-opacity leading-none"
                           >
