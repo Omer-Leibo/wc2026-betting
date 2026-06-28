@@ -164,7 +164,8 @@ async function processOneFixture(fixture: ApiFixture, result: SyncResult): Promi
         matchDate:   new Date(fixture.fixture.date),
         venue:       fixture.fixture.venue.name ?? existingMatch.venue,
         stage:       stage as any,
-        groupRound:  groupRound ?? existingMatch.groupRound,
+        // For GROUP stage keep the round number; for all knockout stages always null
+        groupRound:  stage === 'GROUP' ? (groupRound ?? existingMatch.groupRound) : null,
         homeScore:   homeScore,
         awayScore:   awayScore,
         status:      newStatus,
