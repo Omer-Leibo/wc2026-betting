@@ -122,13 +122,18 @@ function fdStageToRound(stage: string, matchday: number | null): string {
     case 'GROUP_STAGE':      return `Group Stage - ${matchday ?? 1}`;
     case 'REGULAR_SEASON':   return `Regular Season - ${matchday ?? 1}`;
     case 'ROUND_OF_32':      return 'Round of 32';
+    case 'LAST_32':          return 'Round of 32';  // alt name some APIs use
     case 'LAST_16':          return 'Round of 16';
     case 'ROUND_OF_16':      return 'Round of 16';
     case 'QUARTER_FINALS':   return 'Quarter-finals';
+    case 'QUARTER_FINAL':    return 'Quarter-finals';
     case 'SEMI_FINALS':      return 'Semi-finals';
+    case 'SEMI_FINAL':       return 'Semi-finals';
     case 'THIRD_PLACE':      return '3rd Place Final';
     case 'FINAL':            return 'Final';
-    default:                 return `${stage} - ${matchday ?? 1}`;
+    default:
+      console.warn(`[footballApi] Unknown stage from API: "${stage}" (matchday=${matchday})`);
+      return `${stage} - ${matchday ?? 1}`;
   }
 }
 
@@ -282,12 +287,14 @@ export function mapStage(round: string): { stage: string; groupRound: number | n
     const m = round.match(/(\d+)\s*$/);
     return { stage: 'GROUP', groupRound: m ? parseInt(m[1]) : null };
   }
-  if (r.includes('round of 32'))                                        return { stage: 'ROUND_OF_32',    groupRound: null };
-  if (r.includes('round of 16'))                                        return { stage: 'ROUND_OF_16',    groupRound: null };
+  if (r.includes('round of 32') || r.includes('last 32') || r.includes('last_32')) return { stage: 'ROUND_OF_32',    groupRound: null };
+  if (r.includes('round of 16') || r.includes('last 16') || r.includes('last_16')) return { stage: 'ROUND_OF_16',    groupRound: null };
   if (r.includes('quarter'))                                            return { stage: 'QUARTER_FINAL',  groupRound: null };
   if (r.includes('semi'))                                               return { stage: 'SEMI_FINAL',     groupRound: null };
   if (r.includes('3rd') || r.includes('third') || r.includes('place')) return { stage: 'THIRD_PLACE',    groupRound: null };
   if (r.includes('final'))                                              return { stage: 'FINAL',          groupRound: null };
+  // Unknown stage — log a warning and assume GROUP only for genuine group-like strings
+  console.warn(`[footballApi] mapStage: unrecognized round string "${round}" — defaulting to GROUP`);
   return { stage: 'GROUP', groupRound: null };
 }
 
