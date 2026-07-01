@@ -137,9 +137,25 @@ async function processOneFixture(fixture: ApiFixture, result: SyncResult): Promi
     return;
   }
 
-  // ── Build score values (use fulltime, fall back to regular time goals) ────
-  const homeScore = fixture.score.fulltime.home ?? fixture.goals.home;
-  const awayScore = fixture.score.fulltime.away ?? fixture.goals.away;
+  // ── Build score values ────────────────────────────────────────────────────
+  // For PENALTY_SHOOTOUT matches football-data.org fullTime is the cumulative total
+  // (regularTime + extraTime + penaltyGoals).  We want the 120-minute score only.
+  // This correction mirrors the one in footballApi.ts but lives here too so that
+  // the sync is correct regardless of which layer deploys first.
+  let homeScore: number | null;
+  let awayScore: number | null;
+
+  if (
+    fixture.score.duration === 'PENALTY_SHOOTOUT' &&
+    fixture.score.regularTime?.home !== undefined &&
+    fixture.score.regularTime?.home !== null
+  ) {
+    homeScore = (fixture.score.regularTime.home ?? 0) + (fixture.score.extratime?.home ?? 0);
+    awayScore = (fixture.score.regularTime.away ?? 0) + (fixture.score.extratime?.away ?? 0);
+  } else {
+    homeScore = fixture.score.fulltime.home ?? fixture.goals.home;
+    awayScore = fixture.score.fulltime.away ?? fixture.goals.away;
+  }
 
   // ── Find existing match by externalId, or by team pair ───────────────────
   // First try by external ID — this is reliable and prevents a cross-stage collision

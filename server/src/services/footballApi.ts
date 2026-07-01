@@ -96,9 +96,12 @@ export interface ApiFixture {
   };
   goals: { home: number | null; away: number | null };
   score: {
-    fulltime:  { home: number | null; away: number | null };
-    extratime: { home: number | null; away: number | null };
-    penalty:   { home: number | null; away: number | null };
+    // duration lets syncService apply penalty correction independently of this adapter
+    duration:    string;  // REGULAR | EXTRA_TIME | PENALTY_SHOOTOUT
+    fulltime:    { home: number | null; away: number | null };
+    extratime:   { home: number | null; away: number | null };
+    penalty:     { home: number | null; away: number | null };
+    regularTime?: { home: number | null; away: number | null }; // 90-min score (PEN matches)
   };
 }
 
@@ -181,9 +184,13 @@ function mapFdMatchToApiFixture(m: FdMatch): ApiFixture {
       away: scoreAway,
     },
     score: {
-      fulltime:  { home: scoreHome,                       away: scoreAway },
-      extratime: { home: m.score.extraTime?.home ?? null, away: m.score.extraTime?.away ?? null },
-      penalty:   { home: m.score.penalties?.home ?? null, away: m.score.penalties?.away ?? null },
+      duration:    m.score.duration,
+      fulltime:    { home: scoreHome,                       away: scoreAway },
+      extratime:   { home: m.score.extraTime?.home ?? null, away: m.score.extraTime?.away ?? null },
+      penalty:     { home: m.score.penalties?.home ?? null, away: m.score.penalties?.away ?? null },
+      regularTime: m.score.regularTime
+        ? { home: m.score.regularTime.home, away: m.score.regularTime.away }
+        : undefined,
     },
   };
 }
