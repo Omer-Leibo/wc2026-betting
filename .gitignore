@@ -7,6 +7,9 @@ node_modules/
 dist/
 build/
 .next/
+# Allow the server's compiled output to be committed (guarantees Railway runs our exact code)
+!server/dist/
+!server/dist/**
 
 # Environment variables
 .env

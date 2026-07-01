@@ -1,2 +1,2 @@
 [start]
-cmd = "npx prisma migrate deploy && npx ts-node --transpile-only src/index.ts"
+cmd = "npx prisma migrate deploy && node dist/index.js"
