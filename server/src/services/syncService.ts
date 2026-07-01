@@ -157,6 +157,16 @@ async function processOneFixture(fixture: ApiFixture, result: SyncResult): Promi
   if (existingMatch) {
     const wasFinished = existingMatch.status === 'FINISHED';
 
+    // Once a match is already FINISHED we keep the stored score as-is.
+    // Overwriting it on every sync would undo manual corrections (e.g. stripping
+    // penalty-shootout goals from the stored score) and can mis-score bets that
+    // were already awarded under the correct value.
+    // Score is only written when the match is transitioning INTO finished state
+    // (wasFinished=false) or is still in progress.
+    const scoreUpdate = wasFinished
+      ? {}
+      : { homeScore, awayScore };
+
     await prisma.match.update({
       where: { id: existingMatch.id },
       data: {
@@ -166,8 +176,7 @@ async function processOneFixture(fixture: ApiFixture, result: SyncResult): Promi
         stage:       stage as any,
         // For GROUP stage keep the round number; for all knockout stages always null
         groupRound:  stage === 'GROUP' ? (groupRound ?? existingMatch.groupRound) : null,
-        homeScore:   homeScore,
-        awayScore:   awayScore,
+        ...scoreUpdate,
         status:      newStatus,
         // Update team IDs in case the draw changed something
         homeTeamId:  homeTeam.id,
