@@ -62,8 +62,12 @@ interface FdMatch {
   score: {
     winner: string | null; // HOME_TEAM | AWAY_TEAM | DRAW | null
     duration: string;      // REGULAR | EXTRA_TIME | PENALTY_SHOOTOUT
-    fullTime:  { home: number | null; away: number | null };
-    halfTime:  { home: number | null; away: number | null };
+    fullTime:    { home: number | null; away: number | null };
+    halfTime:    { home: number | null; away: number | null };
+    // Only present for EXTRA_TIME / PENALTY_SHOOTOUT matches:
+    regularTime?: { home: number | null; away: number | null }; // 90-min score
+    extraTime?:   { home: number | null; away: number | null }; // ET additional goals
+    penalties?:   { home: number | null; away: number | null }; // penalty-shootout goals only
   };
   venue: string | null;
 }
@@ -138,6 +142,25 @@ function fdStageToRound(stage: string, matchday: number | null): string {
 }
 
 function mapFdMatchToApiFixture(m: FdMatch): ApiFixture {
+  // For PENALTY_SHOOTOUT matches, score.fullTime is the cumulative total
+  // (regularTime goals + extraTime goals + penalty goals), which is wrong for us.
+  // We want the 120-minute score only: regularTime + extraTime (no pens).
+  // For REGULAR and EXTRA_TIME matches, fullTime is already correct.
+  let scoreHome: number | null;
+  let scoreAway: number | null;
+
+  if (m.score.duration === 'PENALTY_SHOOTOUT' && m.score.regularTime) {
+    const rtH = m.score.regularTime.home ?? 0;
+    const rtA = m.score.regularTime.away ?? 0;
+    const etH = m.score.extraTime?.home ?? 0;
+    const etA = m.score.extraTime?.away ?? 0;
+    scoreHome = rtH + etH;
+    scoreAway = rtA + etA;
+  } else {
+    scoreHome = m.score.fullTime.home;
+    scoreAway = m.score.fullTime.away;
+  }
+
   return {
     fixture: {
       id:     m.id,
@@ -154,13 +177,13 @@ function mapFdMatchToApiFixture(m: FdMatch): ApiFixture {
       away: { id: m.awayTeam.id, name: m.awayTeam.name, logo: m.awayTeam.crest },
     },
     goals: {
-      home: m.score.fullTime.home,
-      away: m.score.fullTime.away,
+      home: scoreHome,
+      away: scoreAway,
     },
     score: {
-      fulltime:  { home: m.score.fullTime.home,  away: m.score.fullTime.away },
-      extratime: { home: null, away: null },
-      penalty:   { home: null, away: null },
+      fulltime:  { home: scoreHome,                       away: scoreAway },
+      extratime: { home: m.score.extraTime?.home ?? null, away: m.score.extraTime?.away ?? null },
+      penalty:   { home: m.score.penalties?.home ?? null, away: m.score.penalties?.away ?? null },
     },
   };
 }
