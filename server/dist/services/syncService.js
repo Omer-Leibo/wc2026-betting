@@ -83,14 +83,13 @@ async function syncLiveFixtures() {
 }
 // ─── Bracket slot lookup ──────────────────────────────────────────────────────
 //
-// Maps football-data.org fixture IDs → our bracketSlot numbers.
-// Add new entries here as each knockout round is scheduled by FIFA.
-//
-// R16 slots (1–8): determined after R32 results, Jul 4–7 2026
-// QF  slots (1–4): will be added once QF schedule is confirmed
-// SF  slots (1–2): will be added once SF schedule is confirmed
-const BRACKET_SLOT_MAP = {
-    // ── Round of 16 ──
+// R16 slots are fixed (set manually after the R32 draw was confirmed).
+// QF / SF / Final / 3rd-place slots are assigned automatically:
+//   the Nth new match created in a stage gets slot N.
+//   The football-data.org API returns matches in chronological bracket order,
+//   so this naturally maps to the correct bracket positions without any
+//   hardcoded fixture IDs.
+const R16_BRACKET_SLOT_MAP = {
     537375: 1, // Paraguay vs France
     537376: 2, // Canada vs Morocco
     537377: 3, // Brazil vs Norway
@@ -100,6 +99,8 @@ const BRACKET_SLOT_MAP = {
     537381: 7, // Argentina vs Egypt
     537382: 8, // Switzerland vs Colombia
 };
+// Stages where bracketSlot is auto-assigned (QF and later)
+const AUTO_SLOT_STAGES = new Set(['QUARTER_FINAL', 'SEMI_FINAL', 'FINAL', 'THIRD_PLACE']);
 // ─── Core fixture processing ──────────────────────────────────────────────────
 async function processFixtures(fixtures, result) {
     let updated = 0;
@@ -196,7 +197,16 @@ async function processOneFixture(fixture, result) {
     }
     else {
         // New match (knockout stage matches appear here as tournament progresses)
-        const bracketSlot = BRACKET_SLOT_MAP[fixture.fixture.id] ?? null;
+        // Determine bracket slot:
+        //   R16 → fixed map (slots confirmed after R32 draw)
+        //   QF / SF / Final / 3rd Place → auto-assign as Nth match in that stage.
+        //   The API always returns matches in chronological bracket order, so
+        //   the 1st QF match created = slot 1, 2nd = slot 2, etc.
+        let bracketSlot = R16_BRACKET_SLOT_MAP[fixture.fixture.id] ?? null;
+        if (bracketSlot === null && AUTO_SLOT_STAGES.has(stage)) {
+            const existingCount = await prisma_1.prisma.match.count({ where: { stage: stage } });
+            bracketSlot = existingCount + 1;
+        }
         await prisma_1.prisma.match.create({
             data: {
                 externalId: fixture.fixture.id,
@@ -212,9 +222,7 @@ async function processOneFixture(fixture, result) {
                 bracketSlot,
             },
         });
-        if (bracketSlot) {
-            console.log(`[Sync] Created ${stage} match slot=${bracketSlot}: ${homeTeam.name} vs ${awayTeam.name}`);
-        }
+        console.log(`[Sync] Created ${stage} match slot=${bracketSlot}: ${homeTeam.name} vs ${awayTeam.name}`);
     }
 }
 // ─── Team resolution ──────────────────────────────────────────────────────────
