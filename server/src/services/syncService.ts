@@ -106,6 +106,27 @@ export async function syncLiveFixtures(): Promise<SyncResult> {
   return result;
 }
 
+// ─── Bracket slot lookup ──────────────────────────────────────────────────────
+//
+// Maps football-data.org fixture IDs → our bracketSlot numbers.
+// Add new entries here as each knockout round is scheduled by FIFA.
+//
+// R16 slots (1–8): determined after R32 results, Jul 4–7 2026
+// QF  slots (1–4): will be added once QF schedule is confirmed
+// SF  slots (1–2): will be added once SF schedule is confirmed
+
+const BRACKET_SLOT_MAP: Record<number, number> = {
+  // ── Round of 16 ──
+  537375: 1, // Paraguay vs France
+  537376: 2, // Canada vs Morocco
+  537377: 3, // Brazil vs Norway
+  537378: 4, // Mexico vs England
+  537379: 5, // Portugal vs Spain
+  537380: 6, // United States vs Belgium
+  537381: 7, // Argentina vs Egypt
+  537382: 8, // Switzerland vs Colombia
+};
+
 // ─── Core fixture processing ──────────────────────────────────────────────────
 
 async function processFixtures(fixtures: ApiFixture[], result: SyncResult): Promise<number> {
@@ -213,20 +234,25 @@ async function processOneFixture(fixture: ApiFixture, result: SyncResult): Promi
     }
   } else {
     // New match (knockout stage matches appear here as tournament progresses)
+    const bracketSlot = BRACKET_SLOT_MAP[fixture.fixture.id] ?? null;
     await prisma.match.create({
       data: {
-        externalId: fixture.fixture.id,
-        homeTeamId: homeTeam.id,
-        awayTeamId: awayTeam.id,
-        stage:      stage as any,
-        groupRound: groupRound,
-        matchDate:  new Date(fixture.fixture.date),
-        venue:      fixture.fixture.venue.name ?? undefined,
-        homeScore:  homeScore,
-        awayScore:  awayScore,
-        status:     newStatus,
+        externalId:  fixture.fixture.id,
+        homeTeamId:  homeTeam.id,
+        awayTeamId:  awayTeam.id,
+        stage:       stage as any,
+        groupRound:  groupRound,
+        matchDate:   new Date(fixture.fixture.date),
+        venue:       fixture.fixture.venue.name ?? undefined,
+        homeScore:   homeScore,
+        awayScore:   awayScore,
+        status:      newStatus,
+        bracketSlot,
       },
     });
+    if (bracketSlot) {
+      console.log(`[Sync] Created ${stage} match slot=${bracketSlot}: ${homeTeam.name} vs ${awayTeam.name}`);
+    }
   }
 }
 
